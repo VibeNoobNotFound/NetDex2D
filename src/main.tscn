@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" uid="uid://hostscreen" path="res://scenes/ui/HostScreen.tscn" id="5_host"]
 [ext_resource type="PackedScene" uid="uid://joinscreen" path="res://scenes/ui/JoinScreen.tscn" id="6_join"]
 [ext_resource type="Theme" path="res://assets/themes/NetDexModernTheme.tres" id="7_theme"]
+[ext_resource type="Texture2D" path="res://assets/images/background-red.jpg" id="8_bg"]
 
 [node name="Main" type="Control" unique_id=665908007]
 layout_mode = 3
@@ -16,6 +17,18 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("7_theme")
+
+[node name="GlobalBackground" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+texture = ExtResource("8_bg")
 
 [node name="MainMenu" parent="." unique_id=358429399 instance=ExtResource("1_main")]
 layout_mode = 1

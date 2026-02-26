@@ -4,7 +4,18 @@ namespace NetDex.Managers;
 
 public partial class GameManager : Node
 {
+    private static readonly string[] ScreenNodeNames =
+    {
+        "MainMenu",
+        "HostScreen",
+        "JoinScreen",
+        "LobbyScreen",
+        "GameScreen",
+        "SettingsMenu"
+    };
+
     public static GameManager Instance { get; private set; } = null!;
+    private string _settingsReturnScreen = "MainMenu";
 
     public override void _Ready()
     {
@@ -22,7 +33,16 @@ public partial class GameManager : Node
     public void LoadJoinScreen() => SetMenuState("JoinScreen");
     public void LoadLobby() => SetMenuState("LobbyScreen");
     public void LoadGameScene() => SetMenuState("GameScreen");
-    public void LoadSettingsMenu() => SetMenuState("SettingsMenu");
+    public void LoadSettingsMenu(string returnScreen = "MainMenu")
+    {
+        _settingsReturnScreen = string.IsNullOrWhiteSpace(returnScreen) ? "MainMenu" : returnScreen;
+        SetMenuState("SettingsMenu");
+    }
+
+    public void ReturnFromSettings()
+    {
+        SetMenuState(_settingsReturnScreen);
+    }
 
     private void SetMenuState(string menuName)
     {
@@ -32,12 +52,40 @@ public partial class GameManager : Node
             return;
         }
 
-        foreach (Node child in mainRoot.GetChildren())
+        if (!IsKnownScreen(menuName))
         {
-            if (child is Control controlChild)
+            menuName = "MainMenu";
+        }
+
+        // Background should stay visible across all screens.
+        var globalBackground = mainRoot.GetNodeOrNull<CanvasItem>("GlobalBackground");
+        if (globalBackground != null)
+        {
+            globalBackground.Visible = true;
+        }
+
+        foreach (var screenName in ScreenNodeNames)
+        {
+            var screen = mainRoot.GetNodeOrNull<CanvasItem>(screenName);
+            if (screen == null)
             {
-                controlChild.Visible = controlChild.Name == menuName;
+                continue;
+            }
+
+            screen.Visible = screenName == menuName;
+        }
+    }
+
+    private static bool IsKnownScreen(string menuName)
+    {
+        foreach (var screenName in ScreenNodeNames)
+        {
+            if (screenName == menuName)
+            {
+                return true;
             }
         }
+
+        return false;
     }
 }

@@ -128,6 +128,7 @@ public partial class GameScreen : Control
         _dealSlideSound = GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardSlide2.ogg");
 
         _sfxPlayer = new AudioStreamPlayer();
+        _sfxPlayer.Bus = AudioManager.GetSfxBusName();
         AddChild(_sfxPlayer);
 
         LobbyManager.Instance.MatchSnapshotChanged += OnMatchSnapshotChanged;
@@ -1002,7 +1003,8 @@ public partial class GameScreen : Control
 
         var player = new AudioStreamPlayer
         {
-            Stream = sound
+            Stream = sound,
+            Bus = AudioManager.GetSfxBusName()
         };
         AddChild(player);
         player.Finished += () => player.QueueFree();

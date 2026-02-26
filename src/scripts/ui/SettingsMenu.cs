@@ -8,10 +8,14 @@ public partial class SettingsMenu : Control
     private CheckButton _fullscreenToggle = null!;
     private HSlider _resolutionSlider = null!;
     private Label _qualityLabel = null!;
+    private Label _musicValueLabel = null!;
+    private Label _sfxValueLabel = null!;
+    private HSlider _musicSlider = null!;
+    private HSlider _sfxSlider = null!;
 
     public override void _Ready()
     {
-        var vbox = GetNode<VBoxContainer>("CenterContainer/VBoxContainer");
+        var vbox = GetNode<VBoxContainer>("CenterContainer/MainPanel/VBoxContainer");
 
         var backBtn = vbox.GetNode<Button>("BackButton");
         backBtn.Pressed += OnBackPressed;
@@ -19,6 +23,10 @@ public partial class SettingsMenu : Control
         _fullscreenToggle = vbox.GetNode<CheckButton>("FullscreenToggle");
         _resolutionSlider = vbox.GetNode<HSlider>("ResolutionSlider");
         _qualityLabel = vbox.GetNode<Label>("QualityLabel");
+        _musicSlider = vbox.GetNode<HSlider>("MusicVolumeSlider");
+        _sfxSlider = vbox.GetNode<HSlider>("SfxVolumeSlider");
+        _musicValueLabel = vbox.GetNode<Label>("MusicValueLabel");
+        _sfxValueLabel = vbox.GetNode<Label>("SfxValueLabel");
 
         string platform = OS.GetName();
         bool isMobile = platform == "Android" || platform == "iOS";
@@ -36,6 +44,8 @@ public partial class SettingsMenu : Control
 
         _fullscreenToggle.Toggled += OnFullscreenToggled;
         _resolutionSlider.ValueChanged += OnQualitySliderChanged;
+        _musicSlider.ValueChanged += OnMusicVolumeChanged;
+        _sfxSlider.ValueChanged += OnSfxVolumeChanged;
     }
 
     private void OnFullscreenToggled(bool toggled)
@@ -58,36 +68,80 @@ public partial class SettingsMenu : Control
         SaveSettings();
     }
 
+    private void OnMusicVolumeChanged(double value)
+    {
+        _musicValueLabel.Text = $"Music Volume: {(int)value}%";
+        AudioManager.Instance?.SetMusicVolumePercent(value);
+        SaveSettings();
+    }
+
+    private void OnSfxVolumeChanged(double value)
+    {
+        _sfxValueLabel.Text = $"SFX Volume: {(int)value}%";
+        AudioManager.Instance?.SetSfxVolumePercent(value);
+        SaveSettings();
+    }
+
     private void SaveSettings()
     {
         var config = new ConfigFile();
         config.SetValue("display", "fullscreen", _fullscreenToggle.ButtonPressed);
         config.SetValue("display", "quality", _resolutionSlider.Value);
+        config.SetValue("audio", "music_volume", _musicSlider.Value);
+        config.SetValue("audio", "sfx_volume", _sfxSlider.Value);
         config.Save("user://settings.cfg");
     }
 
     private void LoadSettings()
     {
         var config = new ConfigFile();
-        Error err = config.Load("user://settings.cfg");
-        if (err != Error.Ok)
-            return;
+        _musicSlider.MinValue = 0;
+        _musicSlider.MaxValue = 100;
+        _musicSlider.Step = 1;
+        _sfxSlider.MinValue = 0;
+        _sfxSlider.MaxValue = 100;
+        _sfxSlider.Step = 1;
 
-        bool fullscreen = (bool)config.GetValue("display", "fullscreen", false);
+        bool fullscreen = false;
+        double quality = 100.0;
+        var defaultMusic = AudioManager.Instance?.MusicVolumePercent ?? 80;
+        var defaultSfx = AudioManager.Instance?.SfxVolumePercent ?? 80;
+        double music = defaultMusic;
+        double sfx = defaultSfx;
+
+        Error err = config.Load("user://settings.cfg");
+        if (err == Error.Ok)
+        {
+            fullscreen = (bool)config.GetValue("display", "fullscreen", false);
+            quality = (double)config.GetValue("display", "quality", 100.0);
+            music = (double)config.GetValue("audio", "music_volume", defaultMusic);
+            sfx = (double)config.GetValue("audio", "sfx_volume", defaultSfx);
+        }
+
         _fullscreenToggle.SetPressedNoSignal(fullscreen);
         if (fullscreen)
         {
             DisplayServer.WindowSetMode(DisplayServer.WindowMode.ExclusiveFullscreen);
         }
+        else
+        {
+            DisplayServer.WindowSetMode(DisplayServer.WindowMode.Windowed);
+        }
 
-        double quality = (double)config.GetValue("display", "quality", 100.0);
         _resolutionSlider.SetValueNoSignal(quality);
         _qualityLabel.Text = $"Render Quality: {(int)quality}%";
         GetWindow().ContentScaleFactor = (float)(quality / 100.0);
+
+        _musicSlider.SetValueNoSignal(music);
+        _sfxSlider.SetValueNoSignal(sfx);
+        _musicValueLabel.Text = $"Music Volume: {(int)music}%";
+        _sfxValueLabel.Text = $"SFX Volume: {(int)sfx}%";
+        AudioManager.Instance?.SetMusicVolumePercent(music);
+        AudioManager.Instance?.SetSfxVolumePercent(sfx);
     }
 
     private static void OnBackPressed()
     {
-        GameManager.Instance?.LoadMainMenu();
+        GameManager.Instance?.ReturnFromSettings();
     }
 }

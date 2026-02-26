@@ -28,9 +28,10 @@ public partial class PauseMenu : Control
         Hide();
     }
 
-    private static void OnSettingsPressed()
+    private void OnSettingsPressed()
     {
-        GD.Print("Settings from pause menu not fully implemented.");
+        Hide();
+        GameManager.Instance?.LoadSettingsMenu("GameScreen");
     }
 
     private static void OnLeavePressed()

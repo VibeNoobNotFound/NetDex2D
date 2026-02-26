@@ -25,7 +25,7 @@ public partial class MainMenu : Control
 
     private void OnSettingsPressed()
     {
-        GameManager.Instance?.LoadSettingsMenu();
+        GameManager.Instance?.LoadSettingsMenu("MainMenu");
     }
 
     private void OnExitPressed()
