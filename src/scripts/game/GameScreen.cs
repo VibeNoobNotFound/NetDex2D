@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Godot;
+using NetDex.Core.Config;
 using NetDex.Core.Enums;
 using NetDex.Core.Models;
 using NetDex.Core.Serialization;
@@ -42,11 +44,15 @@ public partial class GameScreen : Control
     private OptionButton _trumpOption = null!;
     private Button _actionButton = null!;
     private Button _secondaryActionButton = null!;
+    private Control _animationLayer = null!;
+    private PanelContainer _trumpAnnouncementPanel = null!;
+    private Label _trumpAnnouncementLabel = null!;
 
     private PackedScene _cardScene = null!;
 
     private AudioStreamOggVorbis[] _placeSounds = Array.Empty<AudioStreamOggVorbis>();
     private AudioStreamOggVorbis[] _slideSounds = Array.Empty<AudioStreamOggVorbis>();
+    private AudioStreamOggVorbis _dealSlideSound = null!;
     private AudioStreamPlayer _sfxPlayer = null!;
 
     private SeatPosition? _localSeat;
@@ -63,6 +69,10 @@ public partial class GameScreen : Control
     private int _pendingFriendlyTricks;
     private int _pendingEnemyTricks;
     private bool _isCollectingTrick;
+    private bool _isDealAnimationRunning;
+    private OmiPhase? _lastPhase;
+    private int _lastTrumpSuit = -1;
+    private Godot.Collections.Dictionary _pendingSnapshot = new();
 
     public override void _Ready()
     {
@@ -87,6 +97,9 @@ public partial class GameScreen : Control
         _trumpOption = GetNode<OptionButton>("ActionPanel/VBoxContainer/TrumpOption");
         _actionButton = GetNode<Button>("ActionPanel/VBoxContainer/ActionButton");
         _secondaryActionButton = GetNode<Button>("ActionPanel/VBoxContainer/SecondaryActionButton");
+        _animationLayer = GetNode<Control>("AnimationLayer");
+        _trumpAnnouncementPanel = GetNode<PanelContainer>("AnimationLayer/TrumpAnnouncementPanel");
+        _trumpAnnouncementLabel = GetNode<Label>("AnimationLayer/TrumpAnnouncementPanel/AnnouncementMargin/AnnouncementLabel");
 
         GetNode<Button>("BackLobbyButton").Pressed += OnBackLobbyPressed;
         _actionButton.Pressed += OnActionButtonPressed;
@@ -112,6 +125,7 @@ public partial class GameScreen : Control
             GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardSlide2.ogg"),
             GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardSlide3.ogg")
         };
+        _dealSlideSound = GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardSlide2.ogg");
 
         _sfxPlayer = new AudioStreamPlayer();
         AddChild(_sfxPlayer);
@@ -163,7 +177,6 @@ public partial class GameScreen : Control
 
     private void RenderSnapshot(Godot.Collections.Dictionary snapshot)
     {
-        ClearHands();
         RenderSeatNames();
 
         if (snapshot.Count == 0)
@@ -171,6 +184,9 @@ public partial class GameScreen : Control
             _statusLabel.Text = "Waiting for match state...";
             _actionPanel.Visible = false;
             ResetBoardVisualState();
+            _lastPhase = null;
+            _lastTrumpSuit = -1;
+            _pendingSnapshot = new Godot.Collections.Dictionary();
             return;
         }
 
@@ -189,15 +205,66 @@ public partial class GameScreen : Control
 
         var teamCredits = ExtractPair(snapshot, "teamCredits", 10, 10);
         var teamTricks = ExtractPair(snapshot, "teamTricks", 0, 0);
-        var creditsText = $"{teamCredits[0]} - {teamCredits[1]}";
-        var tricksText = $"{teamTricks[0]} - {teamTricks[1]}";
+        _statusLabel.Text = BuildStatusText(phase, roundNumber, currentTurnSeat, trumpSuit, teamCredits, teamTricks);
 
-        var trumpText = trumpSuit >= 0 ? ((CardSuit)trumpSuit).ToString() : "Not selected";
-        _statusLabel.Text = $"Round {roundNumber} | Phase: {phase} | Turn: {BuildSeatTitle(currentTurnSeat)} | Trump: {trumpText} | Credits: {creditsText} | Tricks: {tricksText}";
+        TryStartPhaseAnimation(snapshot, phase, trumpSuit);
+        if (_isDealAnimationRunning)
+        {
+            _pendingSnapshot = snapshot.Duplicate(true);
+            RenderActionPanel(snapshot, phase);
+            _lastPhase = phase;
+            _lastTrumpSuit = trumpSuit;
+            return;
+        }
 
+        ClearHands();
         RenderHands(snapshot, phase, currentTurnSeat);
         RenderTrickState(snapshot, roundNumber, currentTurnSeat, teamTricks);
         RenderActionPanel(snapshot, phase);
+        _lastPhase = phase;
+        _lastTrumpSuit = trumpSuit;
+    }
+
+    private string BuildStatusText(OmiPhase phase, int roundNumber, SeatPosition currentTurnSeat, int trumpSuit, int[] teamCredits, int[] teamTricks)
+    {
+        var creditsText = $"{teamCredits[0]} - {teamCredits[1]}";
+        var tricksText = $"{teamTricks[0]} - {teamTricks[1]}";
+        var trumpText = trumpSuit >= 0 ? ((CardSuit)trumpSuit).ToString() : "Not selected";
+        var phaseText = phase switch
+        {
+            OmiPhase.FirstDeal => "Dealing first 4 cards...",
+            OmiPhase.SecondDeal => "Trump selected. Dealing remaining cards...",
+            OmiPhase.TrickResolveHold => "Resolving trick...",
+            _ => $"Phase: {phase}"
+        };
+
+        return $"Round {roundNumber} | {phaseText} | Turn: {BuildSeatTitle(currentTurnSeat)} | Trump: {trumpText} | Credits: {creditsText} | Tricks: {tricksText}";
+    }
+
+    private void TryStartPhaseAnimation(Godot.Collections.Dictionary snapshot, OmiPhase phase, int trumpSuit)
+    {
+        if (_isDealAnimationRunning)
+        {
+            return;
+        }
+
+        var shufflerSeat = ParseSeat(snapshot, "shufflerSeat");
+        var trumpSelectorSeat = ParseSeat(snapshot, "trumpSelectorSeat");
+        if (!shufflerSeat.HasValue || !trumpSelectorSeat.HasValue)
+        {
+            return;
+        }
+
+        if (phase == OmiPhase.FirstDeal && _lastPhase != OmiPhase.FirstDeal)
+        {
+            _ = RunDealAnimationSequence(shufflerSeat.Value, trumpSelectorSeat.Value, includeTrumpAnnouncement: false, trumpSuit);
+            return;
+        }
+
+        if (phase == OmiPhase.SecondDeal && (_lastPhase != OmiPhase.SecondDeal || trumpSuit != _lastTrumpSuit))
+        {
+            _ = RunDealAnimationSequence(shufflerSeat.Value, trumpSelectorSeat.Value, includeTrumpAnnouncement: true, trumpSuit);
+        }
     }
 
     private static int[] ExtractPair(Godot.Collections.Dictionary snapshot, string key, int fallbackLeft, int fallbackRight)
@@ -211,6 +278,128 @@ public partial class GameScreen : Control
         return pair.Count >= 2
             ? new[] { pair[0].AsInt32(), pair[1].AsInt32() }
             : new[] { fallbackLeft, fallbackRight };
+    }
+
+    private static SeatPosition? ParseSeat(Godot.Collections.Dictionary snapshot, string key)
+    {
+        return snapshot.TryGetValue(key, out var variant)
+            ? NetDex.Core.Enums.SeatPositionExtensions.Parse(variant.AsString())
+            : null;
+    }
+
+    private async Task RunDealAnimationSequence(SeatPosition shufflerSeat, SeatPosition dealStartSeat, bool includeTrumpAnnouncement, int trumpSuit)
+    {
+        if (_isDealAnimationRunning)
+        {
+            return;
+        }
+
+        _isDealAnimationRunning = true;
+        _actionPanel.Visible = false;
+
+        if (includeTrumpAnnouncement && trumpSuit >= 0)
+        {
+            var trumpSelector = BuildSeatTitle(dealStartSeat);
+            await ShowTrumpAnnouncementAsync(trumpSelector, (CardSuit)trumpSuit);
+        }
+
+        await AnimateDealAsync(shufflerSeat, dealStartSeat, 4);
+        _isDealAnimationRunning = false;
+
+        if (_pendingSnapshot.Count > 0)
+        {
+            var pending = _pendingSnapshot;
+            _pendingSnapshot = new Godot.Collections.Dictionary();
+            RenderSnapshot(pending);
+        }
+    }
+
+    private async Task ShowTrumpAnnouncementAsync(string selectorName, CardSuit trumpSuit)
+    {
+        _trumpAnnouncementLabel.Text = $"{selectorName} selected {trumpSuit} as trump";
+        _trumpAnnouncementPanel.Visible = true;
+        _trumpAnnouncementPanel.Modulate = new Color(1f, 1f, 1f, 0f);
+        _trumpAnnouncementPanel.Scale = new Vector2(0.92f, 0.92f);
+
+        var fadeIn = CreateTween();
+        fadeIn.TweenProperty(_trumpAnnouncementPanel, "modulate:a", 1f, 0.25f)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        fadeIn.Parallel().TweenProperty(_trumpAnnouncementPanel, "scale", Vector2.One, 0.25f)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        await ToSignal(fadeIn, Tween.SignalName.Finished);
+
+        await ToSignal(GetTree().CreateTimer(Math.Max(0.2, MatchTiming.TrumpAnnouncementSeconds - 0.5)), SceneTreeTimer.SignalName.Timeout);
+
+        var fadeOut = CreateTween();
+        fadeOut.TweenProperty(_trumpAnnouncementPanel, "modulate:a", 0f, 0.22f)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.In);
+        fadeOut.Parallel().TweenProperty(_trumpAnnouncementPanel, "scale", new Vector2(1.05f, 1.05f), 0.22f)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.In);
+        await ToSignal(fadeOut, Tween.SignalName.Finished);
+        _trumpAnnouncementPanel.Visible = false;
+    }
+
+    private async Task AnimateDealAsync(SeatPosition shufflerSeat, SeatPosition dealStartSeat, int cardsPerSeat)
+    {
+        var dealOrder = dealStartSeat.OrderedFrom();
+        var seatCardIndex = new Dictionary<SeatPosition, int>();
+        foreach (SeatPosition seat in Enum.GetValues(typeof(SeatPosition)))
+        {
+            seatCardIndex[seat] = 0;
+        }
+
+        for (var pass = 0; pass < cardsPerSeat; pass++)
+        {
+            foreach (var targetSeat in dealOrder)
+            {
+                SpawnDealCard(shufflerSeat, targetSeat, seatCardIndex[targetSeat]);
+                seatCardIndex[targetSeat] += 1;
+                PlaySound(_dealSlideSound);
+                await ToSignal(GetTree().CreateTimer(MatchTiming.DealCardIntervalSeconds), SceneTreeTimer.SignalName.Timeout);
+            }
+        }
+
+        await ToSignal(GetTree().CreateTimer(MatchTiming.DealCardTravelSeconds + 0.05), SceneTreeTimer.SignalName.Timeout);
+    }
+
+    private void SpawnDealCard(SeatPosition shufflerSeat, SeatPosition targetSeat, int seatCardIndex)
+    {
+        var card = CreateCard(new CardModel($"deal-{Time.GetTicksMsec()}-{seatCardIndex}", CardSuit.Spades, CardRank.Ace), false, false);
+        _animationLayer.AddChild(card);
+        var cardSize = EnsureCardSize(card);
+
+        card.GlobalPosition = GetHandCenterGlobal(shufflerSeat, cardSize);
+        card.ZIndex = 900 + seatCardIndex;
+
+        var target = GetHandCenterGlobal(targetSeat, cardSize) + GetDealSeatOffset(targetSeat, seatCardIndex);
+        var tween = CreateTween();
+        tween.TweenProperty(card, "global_position", target, (float)MatchTiming.DealCardTravelSeconds)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        tween.Finished += () => card.QueueFree();
+    }
+
+    private Vector2 GetHandCenterGlobal(SeatPosition seat, Vector2 cardSize)
+    {
+        var handRect = GetHandContainer(seat).GetGlobalRect();
+        return handRect.Position + handRect.Size / 2f - cardSize / 2f;
+    }
+
+    private Vector2 GetDealSeatOffset(SeatPosition seat, int seatCardIndex)
+    {
+        var indexOffset = seatCardIndex - 1.5f;
+        return ToVisualSlot(seat) switch
+        {
+            VisualSlot.Bottom => new Vector2(indexOffset * 16f, 0),
+            VisualSlot.Top => new Vector2(indexOffset * 16f, 0),
+            VisualSlot.Left => new Vector2(0, indexOffset * 16f),
+            VisualSlot.Right => new Vector2(0, indexOffset * 16f),
+            _ => Vector2.Zero
+        };
     }
 
     private void RenderHands(Godot.Collections.Dictionary snapshot, OmiPhase phase, SeatPosition currentTurnSeat)
@@ -356,6 +545,13 @@ public partial class GameScreen : Control
         _secondaryActionButton.Visible = false;
         _secondaryActionButton.Disabled = true;
         _trumpOption.Visible = false;
+        _actionButton.Disabled = false;
+
+        if (_isDealAnimationRunning || phase == OmiPhase.TrickResolveHold)
+        {
+            _actionPanel.Visible = false;
+            return;
+        }
 
         if (_localRole != ParticipantRole.Player || !_localSeat.HasValue)
         {
@@ -467,7 +663,6 @@ public partial class GameScreen : Control
         }
 
         NetworkRpc.Instance.SendPlayCardRequest(card.CardId);
-        PlaySound(_placeSounds);
     }
 
     private static void OnBackLobbyPressed()
@@ -513,6 +708,10 @@ public partial class GameScreen : Control
         _pendingEnemyTricks = 0;
         _leftPileLabel.Text = "Your Tricks";
         _rightPileLabel.Text = "Enemy Tricks";
+        _isDealAnimationRunning = false;
+        _pendingSnapshot = new Godot.Collections.Dictionary();
+        _trumpAnnouncementPanel.Visible = false;
+        ClearAnimationLayerCards();
     }
 
     private void ClearTrickAndPileVisuals()
@@ -546,6 +745,19 @@ public partial class GameScreen : Control
     {
         foreach (Node child in container.GetChildren())
         {
+            child.QueueFree();
+        }
+    }
+
+    private void ClearAnimationLayerCards()
+    {
+        foreach (Node child in _animationLayer.GetChildren())
+        {
+            if (child == _trumpAnnouncementPanel)
+            {
+                continue;
+            }
+
             child.QueueFree();
         }
     }
@@ -779,6 +991,22 @@ public partial class GameScreen : Control
 
         _sfxPlayer.Stream = sounds[GD.RandRange(0, sounds.Length - 1)];
         _sfxPlayer.Play();
+    }
+
+    private void PlaySound(AudioStream sound)
+    {
+        if (sound == null)
+        {
+            return;
+        }
+
+        var player = new AudioStreamPlayer
+        {
+            Stream = sound
+        };
+        AddChild(player);
+        player.Finished += () => player.QueueFree();
+        player.Play();
     }
 
     private static Card.SuitType ToViewSuit(CardSuit suit)

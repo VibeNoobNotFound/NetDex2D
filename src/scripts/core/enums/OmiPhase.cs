@@ -12,5 +12,6 @@ public enum OmiPhase
     RoundScore = 7,
     MatchScore = 8,
     MatchEnd = 9,
-    PausedReconnect = 10
+    PausedReconnect = 10,
+    TrickResolveHold = 11
 }

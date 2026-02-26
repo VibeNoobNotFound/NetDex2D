@@ -1,5 +1,4 @@
 using Godot;
-using NetDex.AI;
 using NetDex.Core.Commands;
 using NetDex.Core.Enums;
 using NetDex.Core.Models;
@@ -43,28 +42,50 @@ public partial class MatchCoordinator : Node
             return;
         }
 
-        if (!_state.IsPausedForReconnect || !_state.ReconnectPeerId.HasValue)
+        if (_state.IsPausedForReconnect)
+        {
+            if (!_state.ReconnectPeerId.HasValue)
+            {
+                return;
+            }
+
+            if (Time.GetUnixTimeFromSystem() < _state.ReconnectDeadlineUnixSeconds)
+            {
+                return;
+            }
+
+            var room = LobbyManager.Instance.CurrentRoom;
+            if (room == null)
+            {
+                return;
+            }
+
+            if (!room.Participants.TryGetValue(_state.ReconnectPeerId.Value, out var participant) || !participant.Seat.HasValue)
+            {
+                return;
+            }
+
+            ApplyServerCommand(MatchCommand.ForfeitTeam(participant.Seat.Value.TeamIndex()));
+            return;
+        }
+
+        if (_state.PhaseDeadlineUnixSeconds <= 0 || Time.GetUnixTimeFromSystem() < _state.PhaseDeadlineUnixSeconds)
         {
             return;
         }
 
-        if (Time.GetUnixTimeFromSystem() < _state.ReconnectDeadlineUnixSeconds)
+        switch (_state.Phase)
         {
-            return;
+            case OmiPhase.FirstDeal:
+                ApplyServerCommand(MatchCommand.CompleteFirstDeal());
+                return;
+            case OmiPhase.SecondDeal:
+                ApplyServerCommand(MatchCommand.CompleteSecondDeal());
+                return;
+            case OmiPhase.TrickResolveHold:
+                ApplyServerCommand(MatchCommand.ResolveCurrentTrick());
+                return;
         }
-
-        var room = LobbyManager.Instance.CurrentRoom;
-        if (room == null)
-        {
-            return;
-        }
-
-        if (!room.Participants.TryGetValue(_state.ReconnectPeerId.Value, out var participant) || !participant.Seat.HasValue)
-        {
-            return;
-        }
-
-        ApplyServerCommand(MatchCommand.ForfeitTeam(participant.Seat.Value.TeamIndex()));
     }
 
     public bool ServerStartMatch(int requesterPeerId, out string error)

@@ -97,7 +97,15 @@ public partial class AiCoordinator : Node
             return;
         }
 
-        if (state.IsPausedForReconnect || state.Phase is OmiPhase.RoundScore or OmiPhase.MatchEnd or OmiPhase.LobbySeating)
+        if (state.IsPausedForReconnect || state.Phase is
+                OmiPhase.LobbySeating or
+                OmiPhase.FirstDeal or
+                OmiPhase.SecondDeal or
+                OmiPhase.TrickResolveHold or
+                OmiPhase.RoundScore or
+                OmiPhase.MatchScore or
+                OmiPhase.MatchEnd or
+                OmiPhase.PausedReconnect)
         {
             CancelActiveSearch();
             _pendingDecision = null;

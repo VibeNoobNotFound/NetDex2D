@@ -50,6 +50,7 @@ public static class MatchSnapshotSerializer
             ["currentStake"] = state.CurrentStake,
             ["roundWinnerTeam"] = state.RoundWinnerTeam ?? -1,
             ["matchWinnerTeam"] = state.MatchWinnerTeam ?? -1,
+            ["phaseDeadlineUnixSeconds"] = state.PhaseDeadlineUnixSeconds,
             ["isPausedForReconnect"] = state.IsPausedForReconnect,
             ["reconnectPeerId"] = state.ReconnectPeerId ?? -1,
             ["reconnectDeadlineUnixSeconds"] = state.ReconnectDeadlineUnixSeconds,

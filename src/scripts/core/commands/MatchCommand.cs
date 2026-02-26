@@ -69,4 +69,19 @@ public sealed class MatchCommand
         Type = MatchCommandType.ForfeitTeam,
         TeamIndex = teamIndex
     };
+
+    public static MatchCommand CompleteFirstDeal() => new()
+    {
+        Type = MatchCommandType.CompleteFirstDeal
+    };
+
+    public static MatchCommand CompleteSecondDeal() => new()
+    {
+        Type = MatchCommandType.CompleteSecondDeal
+    };
+
+    public static MatchCommand ResolveCurrentTrick() => new()
+    {
+        Type = MatchCommandType.ResolveCurrentTrick
+    };
 }

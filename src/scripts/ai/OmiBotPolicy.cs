@@ -283,6 +283,39 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
                 return;
             }
 
+            if (state.Phase == OmiPhase.FirstDeal)
+            {
+                var transition = rulesEngine.ApplyCommand(state, MatchCommand.CompleteFirstDeal());
+                if (!transition.Success)
+                {
+                    return;
+                }
+
+                continue;
+            }
+
+            if (state.Phase == OmiPhase.SecondDeal)
+            {
+                var transition = rulesEngine.ApplyCommand(state, MatchCommand.CompleteSecondDeal());
+                if (!transition.Success)
+                {
+                    return;
+                }
+
+                continue;
+            }
+
+            if (state.Phase == OmiPhase.TrickResolveHold)
+            {
+                var transition = rulesEngine.ApplyCommand(state, MatchCommand.ResolveCurrentTrick());
+                if (!transition.Success)
+                {
+                    return;
+                }
+
+                continue;
+            }
+
             var actorSeat = ResolveActorSeat(state);
             var actorPeerId = actorSeat == botSeat ? -60000 : -70000 - (int)actorSeat;
             var legal = rulesEngine.EnumerateLegalCommands(state, actorSeat, actorPeerId);

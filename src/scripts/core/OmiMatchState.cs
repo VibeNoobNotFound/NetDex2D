@@ -39,6 +39,7 @@ public sealed class OmiMatchState
     public bool IsPausedForReconnect { get; set; }
     public int? ReconnectPeerId { get; set; }
     public double ReconnectDeadlineUnixSeconds { get; set; }
+    public double PhaseDeadlineUnixSeconds { get; set; }
 
     public OmiMatchState()
     {
@@ -64,6 +65,7 @@ public sealed class OmiMatchState
         CompletedTricksCount = 0;
         RoundWinnerTeam = null;
         TrumpSuit = null;
+        PhaseDeadlineUnixSeconds = 0;
     }
 
     public OmiMatchState DeepClone()
@@ -89,7 +91,8 @@ public sealed class OmiMatchState
             MatchWinnerTeam = MatchWinnerTeam,
             IsPausedForReconnect = IsPausedForReconnect,
             ReconnectPeerId = ReconnectPeerId,
-            ReconnectDeadlineUnixSeconds = ReconnectDeadlineUnixSeconds
+            ReconnectDeadlineUnixSeconds = ReconnectDeadlineUnixSeconds,
+            PhaseDeadlineUnixSeconds = PhaseDeadlineUnixSeconds
         };
 
         foreach (SeatPosition seat in Enum.GetValues(typeof(SeatPosition)))

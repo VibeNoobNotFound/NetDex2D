@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Godot;
 using NetDex.Core.Commands;
+using NetDex.Core.Config;
 using NetDex.Core.Enums;
 using NetDex.Core.Models;
 using NetDex.Core.Serialization;
@@ -32,8 +34,11 @@ public sealed class OmiRulesEngine : IGameRulesEngine
             MatchCommandType.ShuffleAgain => ShuffleAgain(state, command),
             MatchCommandType.FinishShuffle => FinishShuffle(state, command),
             MatchCommandType.CutDeck => CutDeck(state, command),
+            MatchCommandType.CompleteFirstDeal => CompleteFirstDeal(state),
             MatchCommandType.SelectTrump => SelectTrump(state, command),
+            MatchCommandType.CompleteSecondDeal => CompleteSecondDeal(state),
             MatchCommandType.PlayCard => PlayCard(state, command),
+            MatchCommandType.ResolveCurrentTrick => ResolveCurrentTrick(state),
             MatchCommandType.ForfeitTeam => ForfeitTeam(state, command.TeamIndex),
             _ => MatchCommandResult.Fail("Unknown command")
         };
@@ -122,6 +127,9 @@ public sealed class OmiRulesEngine : IGameRulesEngine
                 }
 
                 return commands;
+            case OmiPhase.FirstDeal:
+            case OmiPhase.SecondDeal:
+            case OmiPhase.TrickResolveHold:
             default:
                 return commands;
         }
@@ -148,6 +156,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         state.CurrentTurnSeat = state.ShufflerSeat;
 
         state.Phase = OmiPhase.Shuffle;
+        state.PhaseDeadlineUnixSeconds = 0;
         state.Deck = DeckService.Shuffle(DeckService.BuildOmiDeck(), seed);
         state.DeckCursor = 0;
 
@@ -204,6 +213,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         }
 
         state.Phase = OmiPhase.Cut;
+        state.PhaseDeadlineUnixSeconds = 0;
         state.CurrentTurnSeat = state.CutterSeat;
 
         return MatchCommandResult.Ok(new MatchEvent
@@ -234,8 +244,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
 
         state.Phase = OmiPhase.FirstDeal;
         DealCardsRoundRobin(state, state.TrumpSelectorSeat, 4);
-
-        state.Phase = OmiPhase.TrumpSelect;
+        state.PhaseDeadlineUnixSeconds = Time.GetUnixTimeFromSystem() + MatchTiming.FirstDealRevealSeconds;
         state.CurrentTurnSeat = state.TrumpSelectorSeat;
 
         return MatchCommandResult.Ok(new MatchEvent
@@ -247,6 +256,19 @@ public sealed class OmiRulesEngine : IGameRulesEngine
                 ["phase"] = (int)state.Phase
             }
         });
+    }
+
+    private static MatchCommandResult CompleteFirstDeal(OmiMatchState state)
+    {
+        if (state.Phase != OmiPhase.FirstDeal)
+        {
+            return MatchCommandResult.Fail($"Cannot complete first deal during {state.Phase}");
+        }
+
+        state.Phase = OmiPhase.TrumpSelect;
+        state.PhaseDeadlineUnixSeconds = 0;
+        state.CurrentTurnSeat = state.TrumpSelectorSeat;
+        return MatchCommandResult.Ok();
     }
 
     private static MatchCommandResult SelectTrump(OmiMatchState state, MatchCommand command)
@@ -264,8 +286,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         state.TrumpSuit = command.TrumpSuit;
         state.Phase = OmiPhase.SecondDeal;
         DealCardsRoundRobin(state, state.TrumpSelectorSeat, 4);
-
-        state.Phase = OmiPhase.TrickPlay;
+        state.PhaseDeadlineUnixSeconds = Time.GetUnixTimeFromSystem() + MatchTiming.SecondDealRevealSeconds;
         state.CurrentTurnSeat = state.TrumpSelectorSeat;
 
         return MatchCommandResult.Ok(new MatchEvent
@@ -278,6 +299,19 @@ public sealed class OmiRulesEngine : IGameRulesEngine
                 ["startingSeat"] = state.CurrentTurnSeat.ToString()
             }
         });
+    }
+
+    private static MatchCommandResult CompleteSecondDeal(OmiMatchState state)
+    {
+        if (state.Phase != OmiPhase.SecondDeal)
+        {
+            return MatchCommandResult.Fail($"Cannot complete second deal during {state.Phase}");
+        }
+
+        state.Phase = OmiPhase.TrickPlay;
+        state.PhaseDeadlineUnixSeconds = 0;
+        state.CurrentTurnSeat = state.TrumpSelectorSeat;
+        return MatchCommandResult.Ok();
     }
 
     private static MatchCommandResult PlayCard(OmiMatchState state, MatchCommand command)
@@ -338,6 +372,23 @@ public sealed class OmiRulesEngine : IGameRulesEngine
             return result;
         }
 
+        state.Phase = OmiPhase.TrickResolveHold;
+        state.PhaseDeadlineUnixSeconds = Time.GetUnixTimeFromSystem() + MatchTiming.TrickResolveHoldSeconds;
+        return result;
+    }
+
+    private static MatchCommandResult ResolveCurrentTrick(OmiMatchState state)
+    {
+        if (state.Phase != OmiPhase.TrickResolveHold)
+        {
+            return MatchCommandResult.Fail($"Cannot resolve trick during {state.Phase}");
+        }
+
+        if (state.CurrentTrickCards.Count != 4)
+        {
+            return MatchCommandResult.Fail("Trick resolve requires 4 cards on desk");
+        }
+
         var winningSeat = DetermineTrickWinner(state.CurrentTrickCards, state.TrumpSuit);
         var winnerTeam = winningSeat.TeamIndex();
 
@@ -346,6 +397,9 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         state.CurrentTrickCards.Clear();
         state.CompletedTricksCount += 1;
         state.CurrentTurnSeat = winningSeat;
+        state.PhaseDeadlineUnixSeconds = 0;
+
+        var result = new MatchCommandResult { Success = true };
 
         result.Events.Add(new MatchEvent
         {
@@ -361,6 +415,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
 
         if (state.CompletedTricksCount < 8)
         {
+            state.Phase = OmiPhase.TrickPlay;
             return result;
         }
 
@@ -380,6 +435,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         state.RoundWinnerTeam = winner;
         state.TeamCredits[teamIndex] = 0;
         state.Phase = OmiPhase.MatchEnd;
+        state.PhaseDeadlineUnixSeconds = 0;
 
         return MatchCommandResult.Ok(new MatchEvent
         {
@@ -403,6 +459,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
             state.RoundWinnerTeam = team0 == 8 ? 0 : 1;
             state.MatchWinnerTeam = state.RoundWinnerTeam;
             state.Phase = OmiPhase.MatchEnd;
+            state.PhaseDeadlineUnixSeconds = 0;
 
             result.Events.Add(new MatchEvent
             {
@@ -433,6 +490,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
             state.RoundWinnerTeam = null;
             state.CurrentStake = 2;
             state.Phase = OmiPhase.RoundScore;
+            state.PhaseDeadlineUnixSeconds = 0;
 
             result.Events.Add(new MatchEvent
             {
@@ -481,6 +539,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         {
             state.MatchWinnerTeam = winnerTeam;
             state.Phase = OmiPhase.MatchEnd;
+            state.PhaseDeadlineUnixSeconds = 0;
 
             result.Events.Add(new MatchEvent
             {
@@ -495,6 +554,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         }
 
         state.Phase = OmiPhase.RoundScore;
+        state.PhaseDeadlineUnixSeconds = 0;
     }
 
     private static bool IsCardPlayableByRule(OmiMatchState state, IReadOnlyList<CardModel> hand, CardModel candidate)
