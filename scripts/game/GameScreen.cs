@@ -1,20 +1,29 @@
-using Godot;
+using System;
 using System.Collections.Generic;
+using Godot;
 
 public partial class GameScreen : Control
 {
-    private HBoxContainer _bottomHand;
-    private HBoxContainer _topHand;
-    private VBoxContainer _leftHand;
-    private VBoxContainer _rightHand;
-    private Control _desk;
+    private HBoxContainer _bottomHand = null!;
+    private HBoxContainer _topHand = null!;
+    private VBoxContainer _leftHand = null!;
+    private VBoxContainer _rightHand = null!;
+    private Control _desk = null!;
 
-    private PackedScene _cardScene;
+    private Label _statusLabel = null!;
+    private PanelContainer _actionPanel = null!;
+    private Label _actionLabel = null!;
+    private OptionButton _trumpOption = null!;
+    private Button _actionButton = null!;
 
-    // Sound effects
-    private AudioStreamOggVorbis[] _placeSounds;
-    private AudioStreamOggVorbis[] _slideSounds;
-    private AudioStreamPlayer _sfxPlayer;
+    private PackedScene _cardScene = null!;
+
+    private AudioStreamOggVorbis[] _placeSounds = Array.Empty<AudioStreamOggVorbis>();
+    private AudioStreamOggVorbis[] _slideSounds = Array.Empty<AudioStreamOggVorbis>();
+    private AudioStreamPlayer _sfxPlayer = null!;
+
+    private SeatPosition? _localSeat;
+    private ParticipantRole _localRole = ParticipantRole.Spectator;
 
     public override void _Ready()
     {
@@ -24,9 +33,25 @@ public partial class GameScreen : Control
         _rightHand = GetNode<VBoxContainer>("RightHand");
         _desk = GetNode<Control>("Desk");
 
+        _statusLabel = GetNode<Label>("TopStatus");
+        _actionPanel = GetNode<PanelContainer>("ActionPanel");
+        _actionLabel = GetNode<Label>("ActionPanel/VBoxContainer/ActionLabel");
+        _trumpOption = GetNode<OptionButton>("ActionPanel/VBoxContainer/TrumpOption");
+        _actionButton = GetNode<Button>("ActionPanel/VBoxContainer/ActionButton");
+
+        var backButton = GetNode<Button>("BackLobbyButton");
+        backButton.Pressed += OnBackLobbyPressed;
+
+        _actionButton.Pressed += OnActionButtonPressed;
+
+        _trumpOption.Clear();
+        _trumpOption.AddItem("Hearts", (int)CardSuit.Hearts);
+        _trumpOption.AddItem("Diamonds", (int)CardSuit.Diamonds);
+        _trumpOption.AddItem("Clubs", (int)CardSuit.Clubs);
+        _trumpOption.AddItem("Spades", (int)CardSuit.Spades);
+
         _cardScene = GD.Load<PackedScene>("res://scenes/game/Card.tscn");
 
-        // Load sound effects
         _placeSounds = new AudioStreamOggVorbis[]
         {
             GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardPlace1.ogg"),
@@ -40,12 +65,14 @@ public partial class GameScreen : Control
             GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardSlide3.ogg"),
         };
 
-        // Create an AudioStreamPlayer for SFX
         _sfxPlayer = new AudioStreamPlayer();
         AddChild(_sfxPlayer);
 
-        // Deal dummy cards for testing
-        TestCardDeal();
+        LobbyManager.Instance.MatchSnapshotChanged += OnMatchSnapshotChanged;
+        LobbyManager.Instance.RoomStateChanged += OnRoomStateChanged;
+
+        RefreshLocalIdentity();
+        RenderSnapshot(LobbyManager.Instance.LocalMatchSnapshot);
     }
 
     public override void _Input(InputEvent @event)
@@ -63,77 +90,338 @@ public partial class GameScreen : Control
         }
     }
 
-    private void PlaySound(AudioStreamOggVorbis[] sounds)
+    private void OnRoomStateChanged()
     {
-        if (sounds.Length == 0) return;
-        _sfxPlayer.Stream = sounds[GD.RandRange(0, sounds.Length - 1)];
-        _sfxPlayer.Play();
+        RefreshLocalIdentity();
     }
 
-    public void AddCardToHand(int playerId, Card.SuitType suit, Card.RankType rank, bool faceUp)
+    private void OnMatchSnapshotChanged()
     {
-        var card = _cardScene.Instantiate<Card>();
-
-        switch (playerId)
-        {
-            case 0: _bottomHand.AddChild(card); break;
-            case 1: _leftHand.AddChild(card); break;
-            case 2: _topHand.AddChild(card); break;
-            case 3: _rightHand.AddChild(card); break;
-        }
-
-        card.Setup(suit, rank, faceUp);
-        card.CardClicked += OnCardClicked;
-
-        // Play a slide sound when a card is dealt
-        PlaySound(_slideSounds);
+        RenderSnapshot(LobbyManager.Instance.LocalMatchSnapshot);
     }
 
-    private void TestCardDeal()
+    private void RefreshLocalIdentity()
     {
-        // Player 0 (Bottom - Visible)
-        for (int i = 0; i < 8; i++)
+        _localSeat = LobbyManager.Instance.GetLocalSeat();
+        _localRole = LobbyManager.Instance.GetLocalRole();
+    }
+
+    private void RenderSnapshot(Godot.Collections.Dictionary snapshot)
+    {
+        ClearHandsAndDesk();
+
+        if (snapshot.Count == 0)
         {
-            AddCardToHand(0, (Card.SuitType)(i % 4), (Card.RankType)(7 + i % 8), true);
+            _statusLabel.Text = "Waiting for match state...";
+            _actionPanel.Visible = false;
+            return;
         }
 
-        // Other players (Hidden)
-        for (int p = 1; p < 4; p++)
+        var phase = snapshot.TryGetValue("phase", out var phaseVariant)
+            ? (OmiPhase)phaseVariant.AsInt32()
+            : OmiPhase.LobbySeating;
+
+        var trumpSuit = snapshot.TryGetValue("trumpSuit", out var trumpVariant) ? trumpVariant.AsInt32() : -1;
+        var roundNumber = snapshot.TryGetValue("roundNumber", out var roundVariant) ? roundVariant.AsInt32() : 0;
+
+        var currentTurnSeat = SeatPosition.Bottom;
+        if (snapshot.TryGetValue("currentTurnSeat", out var turnVariant))
         {
-            for (int i = 0; i < 8; i++)
+            currentTurnSeat = SeatPositionExtensions.Parse(turnVariant.AsString()) ?? SeatPosition.Bottom;
+        }
+
+        var teamCreditsText = "10 - 10";
+        if (snapshot.TryGetValue("teamCredits", out var creditsVariant) && creditsVariant.VariantType == Variant.Type.Array)
+        {
+            var credits = creditsVariant.AsGodotArray();
+            if (credits.Count >= 2)
             {
-                AddCardToHand(p, Card.SuitType.Spades, Card.RankType.Ace, false);
+                teamCreditsText = $"{credits[0].AsInt32()} - {credits[1].AsInt32()}";
             }
+        }
+
+        var teamTricksText = "0 - 0";
+        if (snapshot.TryGetValue("teamTricks", out var tricksVariant) && tricksVariant.VariantType == Variant.Type.Array)
+        {
+            var tricks = tricksVariant.AsGodotArray();
+            if (tricks.Count >= 2)
+            {
+                teamTricksText = $"{tricks[0].AsInt32()} - {tricks[1].AsInt32()}";
+            }
+        }
+
+        var trumpText = trumpSuit >= 0 ? ((CardSuit)trumpSuit).ToString() : "Not selected";
+        _statusLabel.Text = $"Round {roundNumber} | Phase: {phase} | Turn: {currentTurnSeat} | Trump: {trumpText} | Credits: {teamCreditsText} | Tricks: {teamTricksText}";
+
+        RenderHands(snapshot, phase, currentTurnSeat);
+        RenderCurrentTrick(snapshot);
+        RenderActionPanel(snapshot, phase);
+    }
+
+    private void RenderHands(Godot.Collections.Dictionary snapshot, OmiPhase phase, SeatPosition currentTurnSeat)
+    {
+        var handCounts = snapshot.TryGetValue("handCounts", out var handCountsVariant) && handCountsVariant.VariantType == Variant.Type.Dictionary
+            ? handCountsVariant.AsGodotDictionary()
+            : new Godot.Collections.Dictionary();
+
+        var visibleHands = snapshot.TryGetValue("visibleHands", out var visibleHandsVariant) && visibleHandsVariant.VariantType == Variant.Type.Dictionary
+            ? visibleHandsVariant.AsGodotDictionary()
+            : new Godot.Collections.Dictionary();
+
+        foreach (SeatPosition seat in Enum.GetValues(typeof(SeatPosition)))
+        {
+            var container = GetHandContainer(seat);
+
+            var visibleCards = new Godot.Collections.Array();
+            if (visibleHands.TryGetValue(seat.ToString(), out var cardsVariant) && cardsVariant.VariantType == Variant.Type.Array)
+            {
+                visibleCards = cardsVariant.AsGodotArray();
+            }
+
+            var totalCount = handCounts.TryGetValue(seat.ToString(), out var countVariant) ? countVariant.AsInt32() : visibleCards.Count;
+
+            var isLocalPlayableSeat = _localSeat.HasValue && _localSeat.Value == seat && _localRole == ParticipantRole.Player;
+            var canInteract = isLocalPlayableSeat && phase == OmiPhase.TrickPlay && currentTurnSeat == seat;
+
+            if (visibleCards.Count > 0)
+            {
+                foreach (var item in visibleCards)
+                {
+                    if (item.VariantType != Variant.Type.Dictionary)
+                    {
+                        continue;
+                    }
+
+                    var cardModel = CardModelConversions.FromDictionary(item.AsGodotDictionary());
+                    var card = CreateCard(cardModel, true, canInteract);
+                    container.AddChild(card);
+                }
+            }
+            else
+            {
+                for (var i = 0; i < totalCount; i++)
+                {
+                    var hidden = CreateCard(new CardModel($"hidden-{seat}-{i}", CardSuit.Spades, CardRank.Ace), false, false);
+                    container.AddChild(hidden);
+                }
+            }
+        }
+    }
+
+    private void RenderCurrentTrick(Godot.Collections.Dictionary snapshot)
+    {
+        if (!snapshot.TryGetValue("currentTrick", out var currentTrickVariant) || currentTrickVariant.VariantType != Variant.Type.Array)
+        {
+            return;
+        }
+
+        var currentTrick = currentTrickVariant.AsGodotArray();
+        foreach (var item in currentTrick)
+        {
+            if (item.VariantType != Variant.Type.Dictionary)
+            {
+                continue;
+            }
+
+            var dict = item.AsGodotDictionary();
+            var seat = dict.TryGetValue("seat", out var seatVariant)
+                ? SeatPositionExtensions.Parse(seatVariant.AsString()) ?? SeatPosition.Bottom
+                : SeatPosition.Bottom;
+
+            if (!dict.TryGetValue("card", out var cardVariant) || cardVariant.VariantType != Variant.Type.Dictionary)
+            {
+                continue;
+            }
+
+            var cardModel = CardModelConversions.FromDictionary(cardVariant.AsGodotDictionary());
+            var card = CreateCard(cardModel, true, false);
+            _desk.AddChild(card);
+            card.Position = GetDeskCardPosition(seat, card.Size);
+        }
+    }
+
+    private void RenderActionPanel(Godot.Collections.Dictionary snapshot, OmiPhase phase)
+    {
+        if (_localRole != ParticipantRole.Player || !_localSeat.HasValue)
+        {
+            _actionPanel.Visible = false;
+            return;
+        }
+
+        var cutterSeat = snapshot.TryGetValue("cutterSeat", out var cutterVariant)
+            ? SeatPositionExtensions.Parse(cutterVariant.AsString())
+            : null;
+
+        var trumpSelectorSeat = snapshot.TryGetValue("trumpSelectorSeat", out var selectorVariant)
+            ? SeatPositionExtensions.Parse(selectorVariant.AsString())
+            : null;
+
+        if (phase == OmiPhase.Cut && cutterSeat == _localSeat)
+        {
+            _actionPanel.Visible = true;
+            _actionLabel.Text = "Your action: cut the deck";
+            _trumpOption.Visible = false;
+            _actionButton.Text = "Cut Deck";
+            return;
+        }
+
+        if (phase == OmiPhase.TrumpSelect && trumpSelectorSeat == _localSeat)
+        {
+            _actionPanel.Visible = true;
+            _actionLabel.Text = "Your action: select trump suit";
+            _trumpOption.Visible = true;
+            _actionButton.Text = "Select Trump";
+            return;
+        }
+
+        _actionPanel.Visible = false;
+    }
+
+    private void OnActionButtonPressed()
+    {
+        var snapshot = LobbyManager.Instance.LocalMatchSnapshot;
+        if (snapshot.Count == 0)
+        {
+            return;
+        }
+
+        var phase = snapshot.TryGetValue("phase", out var phaseVariant)
+            ? (OmiPhase)phaseVariant.AsInt32()
+            : OmiPhase.LobbySeating;
+
+        if (phase == OmiPhase.Cut)
+        {
+            var cutIndex = GD.RandRange(1, 31);
+            NetworkRpc.Instance.SendCutDeckRequest(cutIndex);
+            return;
+        }
+
+        if (phase == OmiPhase.TrumpSelect)
+        {
+            var suit = (CardSuit)_trumpOption.GetSelectedId();
+            NetworkRpc.Instance.SendSelectTrumpRequest(suit);
         }
     }
 
     private void OnCardClicked(Card card)
     {
-        if (card.GetParent() == _bottomHand || card.GetParent() == _topHand || card.GetParent() == _leftHand || card.GetParent() == _rightHand)
+        if (_localRole != ParticipantRole.Player)
         {
-            PlayCardToDesk(card);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(card.CardId) || card.CardId.StartsWith("hidden-"))
+        {
+            return;
+        }
+
+        NetworkRpc.Instance.SendPlayCardRequest(card.CardId);
+        PlaySound(_placeSounds);
+    }
+
+    private void OnBackLobbyPressed()
+    {
+        GameManager.Instance?.LoadLobby();
+    }
+
+    private Card CreateCard(CardModel model, bool faceUp, bool interactable)
+    {
+        var card = _cardScene.Instantiate<Card>();
+        card.Setup(ToViewSuit(model.Suit), ToViewRank(model.Rank), faceUp, model.Id);
+        card.SetInteractable(interactable);
+
+        if (interactable)
+        {
+            card.CardClicked += OnCardClicked;
+        }
+
+        if (faceUp)
+        {
+            PlaySound(_slideSounds);
+        }
+
+        return card;
+    }
+
+    private void ClearHandsAndDesk()
+    {
+        ClearContainer(_bottomHand);
+        ClearContainer(_topHand);
+        ClearContainer(_leftHand);
+        ClearContainer(_rightHand);
+        ClearContainer(_desk);
+    }
+
+    private static void ClearContainer(Node container)
+    {
+        foreach (Node child in container.GetChildren())
+        {
+            child.QueueFree();
         }
     }
 
-    public void PlayCardToDesk(Card card)
+    private Control GetHandContainer(SeatPosition seat)
     {
-        card.CardClicked -= OnCardClicked;
+        return seat switch
+        {
+            SeatPosition.Bottom => _bottomHand,
+            SeatPosition.Right => _rightHand,
+            SeatPosition.Top => _topHand,
+            SeatPosition.Left => _leftHand,
+            _ => _bottomHand
+        };
+    }
 
-        var startGlobalPos = card.GlobalPosition;
-        card.GetParent().RemoveChild(card);
-        _desk.AddChild(card);
+    private Vector2 GetDeskCardPosition(SeatPosition seat, Vector2 cardSize)
+    {
+        var center = _desk.Size / 2f - cardSize / 2f;
 
-        Vector2 targetPos = _desk.Size / 2 - card.Size / 2;
-        targetPos += new Vector2((float)GD.RandRange(-40, 40), (float)GD.RandRange(-40, 40));
+        return seat switch
+        {
+            SeatPosition.Bottom => center + new Vector2(0, 110),
+            SeatPosition.Right => center + new Vector2(110, 0),
+            SeatPosition.Top => center + new Vector2(0, -110),
+            SeatPosition.Left => center + new Vector2(-110, 0),
+            _ => center
+        };
+    }
 
-        card.GlobalPosition = startGlobalPos;
-        card.SetFaceUp(true);
+    private void PlaySound(AudioStreamOggVorbis[] sounds)
+    {
+        if (sounds.Length == 0)
+        {
+            return;
+        }
 
-        // Play card placement sound
-        PlaySound(_placeSounds);
+        _sfxPlayer.Stream = sounds[GD.RandRange(0, sounds.Length - 1)];
+        _sfxPlayer.Play();
+    }
 
-        var tween = CreateTween();
-        tween.SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
-        tween.TweenProperty(card, "position", targetPos, 0.3f);
+    private static Card.SuitType ToViewSuit(CardSuit suit)
+    {
+        return suit switch
+        {
+            CardSuit.Hearts => Card.SuitType.Hearts,
+            CardSuit.Diamonds => Card.SuitType.Diamonds,
+            CardSuit.Clubs => Card.SuitType.Clubs,
+            CardSuit.Spades => Card.SuitType.Spades,
+            _ => Card.SuitType.Spades
+        };
+    }
+
+    private static Card.RankType ToViewRank(CardRank rank)
+    {
+        return rank switch
+        {
+            CardRank.Seven => Card.RankType.Seven,
+            CardRank.Eight => Card.RankType.Eight,
+            CardRank.Nine => Card.RankType.Nine,
+            CardRank.Ten => Card.RankType.Ten,
+            CardRank.Jack => Card.RankType.Jack,
+            CardRank.Queen => Card.RankType.Queen,
+            CardRank.King => Card.RankType.King,
+            CardRank.Ace => Card.RankType.Ace,
+            _ => Card.RankType.Seven
+        };
     }
 }

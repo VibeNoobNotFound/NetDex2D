@@ -20,6 +20,27 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.133333, 0.4, 0.133333, 1)
 
+[node name="TopStatus" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -500.0
+offset_top = 14.0
+offset_right = 500.0
+offset_bottom = 46.0
+grow_horizontal = 2
+horizontal_alignment = 1
+text = "Waiting for match"
+
+[node name="BackLobbyButton" type="Button" parent="."]
+layout_mode = 1
+offset_left = 20.0
+offset_top = 16.0
+offset_right = 150.0
+offset_bottom = 52.0
+text = "Back to Lobby"
+
 [node name="Desk" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 8
@@ -27,9 +48,9 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -200.0
+offset_left = -220.0
 offset_top = -200.0
-offset_right = 200.0
+offset_right = 220.0
 offset_bottom = 200.0
 grow_horizontal = 2
 grow_vertical = 2
@@ -41,10 +62,10 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -200.0
-offset_top = -150.0
-offset_right = 200.0
-offset_bottom = -30.0
+offset_left = -280.0
+offset_top = -160.0
+offset_right = 280.0
+offset_bottom = -26.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_constants/separation = 10
@@ -55,12 +76,12 @@ layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -200.0
-offset_top = 30.0
-offset_right = 200.0
-offset_bottom = 150.0
+offset_left = -280.0
+offset_top = 40.0
+offset_right = 280.0
+offset_bottom = 160.0
 grow_horizontal = 2
-theme_override_constants/separation = -40
+theme_override_constants/separation = -34
 alignment = 1
 
 [node name="LeftHand" type="VBoxContainer" parent="."]
@@ -68,12 +89,12 @@ layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
 anchor_bottom = 0.5
-offset_left = 30.0
-offset_top = -200.0
-offset_right = 110.0
-offset_bottom = 200.0
+offset_left = 24.0
+offset_top = -210.0
+offset_right = 108.0
+offset_bottom = 210.0
 grow_vertical = 2
-theme_override_constants/separation = -50
+theme_override_constants/separation = -44
 alignment = 1
 
 [node name="RightHand" type="VBoxContainer" parent="."]
@@ -83,11 +104,38 @@ anchor_left = 1.0
 anchor_top = 0.5
 anchor_right = 1.0
 anchor_bottom = 0.5
-offset_left = -110.0
-offset_top = -200.0
-offset_right = -30.0
-offset_bottom = 200.0
+offset_left = -108.0
+offset_top = -210.0
+offset_right = -24.0
+offset_bottom = 210.0
 grow_horizontal = 0
 grow_vertical = 2
-theme_override_constants/separation = -50
+theme_override_constants/separation = -44
 alignment = 1
+
+[node name="ActionPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -170.0
+offset_top = 64.0
+offset_right = 170.0
+offset_bottom = 190.0
+grow_horizontal = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ActionPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ActionLabel" type="Label" parent="ActionPanel/VBoxContainer"]
+layout_mode = 2
+text = "Action"
+horizontal_alignment = 1
+
+[node name="TrumpOption" type="OptionButton" parent="ActionPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="ActionButton" type="Button" parent="ActionPanel/VBoxContainer"]
+layout_mode = 2
+text = "Confirm"

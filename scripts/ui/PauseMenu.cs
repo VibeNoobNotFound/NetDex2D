@@ -40,6 +40,7 @@ public partial class PauseMenu : Control
     {
         Hide();
         // GetTree().Paused = false;
+        NetworkManager.Instance.DisconnectSession("Left match");
         GameManager.Instance?.LoadMainMenu();
     }
 }

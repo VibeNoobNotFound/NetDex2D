@@ -18,6 +18,10 @@ config/icon="res://icon.svg"
 [autoload]
 
 GameManager="*res://scripts/managers/GameManager.cs"
+LobbyManager="*res://scripts/lobby/LobbyManager.cs"
+MatchCoordinator="*res://scripts/game/MatchCoordinator.cs"
+NetworkRpc="*res://scripts/network/NetworkRpc.cs"
+NetworkManager="*res://scripts/network/NetworkManager.cs"
 
 [display]
 

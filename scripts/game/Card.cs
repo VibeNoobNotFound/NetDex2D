@@ -9,15 +9,17 @@ public partial class Card : Control
     public SuitType Suit { get; private set; }
     public RankType Rank { get; private set; }
     public bool IsFaceUp { get; private set; }
+    public string CardId { get; private set; } = string.Empty;
+    public bool IsInteractable { get; private set; } = true;
 
     [Signal]
     public delegate void CardClickedEventHandler(Card card);
 
-    private TextureRect _textureRect;
+    private TextureRect _textureRect = null!;
 
     // Spritesheet references
-    private static Texture2D _cardSheet;
-    private static Texture2D _backSheet;
+    private static Texture2D _cardSheet = null!;
+    private static Texture2D _backSheet = null!;
 
     // Card dimensions in the spritesheet
     private const int CardWidth = 140;
@@ -37,15 +39,21 @@ public partial class Card : Control
         UpdateVisuals();
     }
 
-    public void Setup(SuitType suit, RankType rank, bool isFaceUp = false)
+    public void Setup(SuitType suit, RankType rank, bool isFaceUp = false, string cardId = "")
     {
         Suit = suit;
         Rank = rank;
         IsFaceUp = isFaceUp;
+        CardId = cardId;
         if (IsInsideTree())
         {
             UpdateVisuals();
         }
+    }
+
+    public void SetInteractable(bool interactable)
+    {
+        IsInteractable = interactable;
     }
 
     public void SetFaceUp(bool faceUp)
@@ -152,6 +160,11 @@ public partial class Card : Control
 
     private void OnGuiInput(InputEvent @event)
     {
+        if (!IsInteractable)
+        {
+            return;
+        }
+
         if (@event is InputEventMouseButton mouseEvent && mouseEvent.Pressed && mouseEvent.ButtonIndex == MouseButton.Left)
         {
             EmitSignal(SignalName.CardClicked, this);
@@ -160,11 +173,21 @@ public partial class Card : Control
 
     private void OnMouseEntered()
     {
+        if (!IsInteractable)
+        {
+            return;
+        }
+
         Position -= new Vector2(0, 10);
     }
 
     private void OnMouseExited()
     {
+        if (!IsInteractable)
+        {
+            return;
+        }
+
         Position += new Vector2(0, 10);
     }
 }

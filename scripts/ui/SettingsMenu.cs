@@ -2,9 +2,9 @@ using Godot;
 
 public partial class SettingsMenu : Control
 {
-    private CheckButton _fullscreenToggle;
-    private HSlider _resolutionSlider;
-    private Label _qualityLabel;
+    private CheckButton _fullscreenToggle = null!;
+    private HSlider _resolutionSlider = null!;
+    private Label _qualityLabel = null!;
 
     public override void _Ready()
     {
