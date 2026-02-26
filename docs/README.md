@@ -1,8 +1,8 @@
 # NetDex Docs (Beginner Friendly)
 
-This folder explains how the game works, especially the backend (multiplayer + rules engine).
+The `docs/` folder explains how the game works, especially the backend (multiplayer + rules engine).
 
-The project code is now inside `src/`.
+The project code is in `src/`.
 
 If you are new, read in this order:
 
