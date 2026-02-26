@@ -38,6 +38,7 @@ public partial class HostScreen : Control
 
     private void OnCreateHostPressed()
     {
+        SetStatus("Creating Room...");
         var result = NetworkManager.Instance.StartHostSession(_roomNameInput.Text, _playerNameInput.Text);
         if (result != Error.Ok)
         {

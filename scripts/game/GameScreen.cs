@@ -685,7 +685,7 @@ public partial class GameScreen : Control
         var isFriendlyWinner = winnerTeam == localTeam;
         var pile = isFriendlyWinner ? _leftTrickPile : _rightTrickPile;
         var pileCount = isFriendlyWinner ? _friendlyPileCards.Count : _enemyPileCards.Count;
-        var baseTarget = new Vector2(8 + pileCount * 2, 8 - pileCount * 2);
+        var baseTarget = new Vector2(6 + pileCount * 5, 10 + pileCount * 3);
 
         var tween = CreateTween();
         tween.SetParallel(true);
@@ -737,6 +737,11 @@ public partial class GameScreen : Control
 
     private void SyncSinglePile(List<Card> pileCards, Control pileContainer, int targetCount)
     {
+        const float stackXStep = 5f;
+        const float stackYStep = 3f;
+        const float baseX = 6f;
+        const float baseY = 10f;
+
         while (pileCards.Count > targetCount)
         {
             var last = pileCards[^1];
@@ -748,8 +753,8 @@ public partial class GameScreen : Control
         {
             var marker = CreateCard(new CardModel($"pile-{pileCards.Count}", CardSuit.Spades, CardRank.Ace), false, false);
             pileContainer.AddChild(marker);
-            marker.Position = new Vector2(pileCards.Count * 2, -pileCards.Count * 2);
-            marker.ZIndex = pileCards.Count;
+            marker.Position = new Vector2(baseX + pileCards.Count * stackXStep, baseY + pileCards.Count * stackYStep);
+            marker.ZIndex = 100 + pileCards.Count;
             pileCards.Add(marker);
         }
     }
