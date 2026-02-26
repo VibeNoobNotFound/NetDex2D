@@ -1,12 +1,6 @@
-using Godot;
+using NetDex.Core.Enums;
 
-public interface IGameRulesEngine
-{
-    OmiMatchState CreateInitialMatchState(SeatPosition hostSeat, int initialCredits = 10);
-    MatchCommandResult ApplyCommand(OmiMatchState state, MatchCommand command);
-    VisibleMatchState GetVisibleStateForPeer(OmiMatchState state, SeatPosition? viewerSeat, ParticipantRole role);
-    Godot.Collections.Dictionary SerializeSnapshot(VisibleMatchState visibleState);
-}
+namespace NetDex.Core.Rules;
 
 public static class GameTypeRegistry
 {

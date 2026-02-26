@@ -30,86 +30,39 @@ grow_vertical = 2
 
 [node name="MainPanel" type="PanelContainer" parent="CenterContainer"]
 layout_mode = 2
-custom_minimum_size = Vector2(640, 620)
+custom_minimum_size = Vector2(420, 420)
 
 [node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/MainPanel"]
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 12
 
 [node name="Title" type="Label" parent="CenterContainer/MainPanel/VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 42
-text = "Omi Multiplayer"
+theme_override_font_sizes/font_size = 44
+text = "Omi"
 horizontal_alignment = 1
 
-[node name="PlayerNameInput" type="LineEdit" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="Subtitle" type="Label" parent="CenterContainer/MainPanel/VBoxContainer"]
 layout_mode = 2
-placeholder_text = "Player Name"
-text = "Player"
-
-[node name="RoomNameInput" type="LineEdit" parent="CenterContainer/MainPanel/VBoxContainer"]
-layout_mode = 2
-placeholder_text = "Room Name (for host)"
-text = "My Omi Room"
+text = "Multiplayer"
+horizontal_alignment = 1
 
 [node name="HostButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
-custom_minimum_size = Vector2(0, 44)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
-text = "Host Room"
+text = "Host"
 
-[node name="HSeparator1" type="HSeparator" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="JoinButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
-
-[node name="RoomsLabel" type="Label" parent="CenterContainer/MainPanel/VBoxContainer"]
-layout_mode = 2
-text = "LAN Rooms"
-
-[node name="DiscoveredRooms" type="ItemList" parent="CenterContainer/MainPanel/VBoxContainer"]
-custom_minimum_size = Vector2(0, 170)
-layout_mode = 2
-select_mode = 1
-
-[node name="RefreshRoomsButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
-layout_mode = 2
-text = "Refresh Rooms"
-
-[node name="PlayButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-text = "Join as Player"
-
-[node name="SpectateButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-text = "Join as Spectator"
-
-[node name="HSeparator2" type="HSeparator" parent="CenterContainer/MainPanel/VBoxContainer"]
-layout_mode = 2
-
-[node name="DirectIpInput" type="LineEdit" parent="CenterContainer/MainPanel/VBoxContainer"]
-layout_mode = 2
-placeholder_text = "Direct Host IP"
-
-[node name="DirectJoinButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
-layout_mode = 2
-text = "Direct Join as Player"
-
-[node name="DirectSpectateButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
-layout_mode = 2
-text = "Direct Join as Spectator"
-
-[node name="HSeparator3" type="HSeparator" parent="CenterContainer/MainPanel/VBoxContainer"]
-layout_mode = 2
+text = "Join"
 
 [node name="SettingsButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 text = "Settings"
 
 [node name="ExitButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 text = "Exit"
-
-[node name="StatusLabel" type="Label" parent="CenterContainer/MainPanel/VBoxContainer"]
-layout_mode = 2
-text = "Ready"
-autowrap_mode = 2

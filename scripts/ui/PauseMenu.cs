@@ -1,45 +1,40 @@
 using Godot;
+using NetDex.Managers;
+using NetDex.Networking;
+
+namespace NetDex.UI.Game;
 
 public partial class PauseMenu : Control
 {
     public override void _Ready()
     {
         Hide();
-        
-        var resumeBtn = GetNode<Button>("PanelContainer/VBoxContainer/ResumeButton");
-        resumeBtn.Pressed += OnResumePressed;
 
-        var settingsBtn = GetNode<Button>("PanelContainer/VBoxContainer/SettingsButton");
-        settingsBtn.Pressed += OnSettingsPressed;
-
-        var leaveBtn = GetNode<Button>("PanelContainer/VBoxContainer/LeaveButton");
-        leaveBtn.Pressed += OnLeavePressed;
+        GetNode<Button>("PanelContainer/VBoxContainer/ResumeButton").Pressed += OnResumePressed;
+        GetNode<Button>("PanelContainer/VBoxContainer/SettingsButton").Pressed += OnSettingsPressed;
+        GetNode<Button>("PanelContainer/VBoxContainer/LeaveButton").Pressed += OnLeavePressed;
     }
 
     public override void _Input(InputEvent @event)
     {
-        if (@event.IsActionPressed("ui_cancel")) // Escape key
+        if (@event.IsActionPressed("ui_cancel"))
         {
             Visible = !Visible;
-            // GetTree().Paused = Visible; // If we want to physically pause
         }
     }
 
     private void OnResumePressed()
     {
         Hide();
-        // GetTree().Paused = false;
     }
 
-    private void OnSettingsPressed()
+    private static void OnSettingsPressed()
     {
         GD.Print("Settings from pause menu not fully implemented.");
     }
 
-    private void OnLeavePressed()
+    private static void OnLeavePressed()
     {
-        Hide();
-        // GetTree().Paused = false;
         NetworkManager.Instance.DisconnectSession("Left match");
         GameManager.Instance?.LoadMainMenu();
     }

@@ -1,6 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using NetDex.Core.Enums;
+using NetDex.Core.Models;
+
+namespace NetDex.Core.Rules;
 
 public static class DeckService
 {
@@ -12,8 +16,7 @@ public static class DeckService
         {
             for (var rank = (int)CardRank.Seven; rank <= (int)CardRank.Ace; rank++)
             {
-                var card = new CardModel($"{suit}-{rank}", suit, (CardRank)rank);
-                deck.Add(card);
+                deck.Add(new CardModel($"{suit}-{rank}", suit, (CardRank)rank));
             }
         }
 
@@ -42,7 +45,6 @@ public static class DeckService
         }
 
         var normalizedCut = Math.Clamp(cutIndex, 0, source.Count - 1);
-
         var top = source.Take(normalizedCut).ToList();
         var bottom = source.Skip(normalizedCut).ToList();
         bottom.AddRange(top);

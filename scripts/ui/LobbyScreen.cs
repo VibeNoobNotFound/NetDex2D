@@ -1,7 +1,12 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using NetDex.Core.Enums;
+using NetDex.Lobby;
+using NetDex.Managers;
+using NetDex.Networking;
+
+namespace NetDex.UI.Lobby;
 
 public partial class LobbyScreen : Control
 {
@@ -10,28 +15,31 @@ public partial class LobbyScreen : Control
     private ItemList _playersList = null!;
     private ItemList _spectatorsList = null!;
 
+    private PanelContainer _seatsPanel = null!;
+    private Button _startMatchButton = null!;
+
     private readonly Dictionary<SeatPosition, OptionButton> _seatOptions = new();
+    private RoomMatchLifecycle? _lastLifecycle;
 
     public override void _Ready()
     {
         _roomLabel = GetNode<Label>("MarginContainer/VBoxContainer/RoomLabel");
         _statusLabel = GetNode<Label>("MarginContainer/VBoxContainer/StatusLabel");
-        _playersList = GetNode<ItemList>("MarginContainer/VBoxContainer/HBox/PlayersPanel/PlayersList");
-        _spectatorsList = GetNode<ItemList>("MarginContainer/VBoxContainer/HBox/SpectatorsPanel/SpectatorsList");
+        _playersList = GetNode<ItemList>("MarginContainer/VBoxContainer/HBox/PlayersPanel/PlayersVBox/PlayersList");
+        _spectatorsList = GetNode<ItemList>("MarginContainer/VBoxContainer/HBox/SpectatorsPanel/SpectatorsVBox/SpectatorsList");
 
-        _seatOptions[SeatPosition.Bottom] = GetNode<OptionButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsGrid/BottomSeatOption");
-        _seatOptions[SeatPosition.Right] = GetNode<OptionButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsGrid/RightSeatOption");
-        _seatOptions[SeatPosition.Top] = GetNode<OptionButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsGrid/TopSeatOption");
-        _seatOptions[SeatPosition.Left] = GetNode<OptionButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsGrid/LeftSeatOption");
+        _seatsPanel = GetNode<PanelContainer>("MarginContainer/VBoxContainer/SeatsPanel");
 
-        var applySeatsButton = GetNode<Button>("MarginContainer/VBoxContainer/SeatsPanel/SeatsActions/ApplySeatsButton");
+        _seatOptions[SeatPosition.Bottom] = GetNode<OptionButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/BottomSeatOption");
+        _seatOptions[SeatPosition.Right] = GetNode<OptionButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/RightSeatOption");
+        _seatOptions[SeatPosition.Top] = GetNode<OptionButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/TopSeatOption");
+        _seatOptions[SeatPosition.Left] = GetNode<OptionButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/LeftSeatOption");
+
+        var applySeatsButton = GetNode<Button>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsActions/ApplySeatsButton");
         applySeatsButton.Pressed += OnApplySeatsPressed;
 
-        var startMatchButton = GetNode<Button>("MarginContainer/VBoxContainer/Actions/StartMatchButton");
-        startMatchButton.Pressed += OnStartMatchPressed;
-
-        var openGameButton = GetNode<Button>("MarginContainer/VBoxContainer/Actions/OpenGameButton");
-        openGameButton.Pressed += OnOpenGamePressed;
+        _startMatchButton = GetNode<Button>("MarginContainer/VBoxContainer/Actions/StartMatchButton");
+        _startMatchButton.Pressed += OnStartMatchPressed;
 
         var leaveButton = GetNode<Button>("MarginContainer/VBoxContainer/Actions/LeaveRoomButton");
         leaveButton.Pressed += OnLeavePressed;
@@ -39,8 +47,28 @@ public partial class LobbyScreen : Control
         LobbyManager.Instance.RoomStateChanged += RefreshLobbyView;
         NetworkManager.Instance.NetworkMessage += OnNetworkMessage;
         NetworkRpc.Instance.ServerMessage += OnServerMessage;
+        NetworkRpc.Instance.ServerEventReceived += OnServerEventReceived;
 
         RefreshLobbyView();
+    }
+
+    public override void _ExitTree()
+    {
+        if (LobbyManager.Instance != null)
+        {
+            LobbyManager.Instance.RoomStateChanged -= RefreshLobbyView;
+        }
+
+        if (NetworkManager.Instance != null)
+        {
+            NetworkManager.Instance.NetworkMessage -= OnNetworkMessage;
+        }
+
+        if (NetworkRpc.Instance != null)
+        {
+            NetworkRpc.Instance.ServerMessage -= OnServerMessage;
+            NetworkRpc.Instance.ServerEventReceived -= OnServerEventReceived;
+        }
     }
 
     private void RefreshLobbyView()
@@ -48,10 +76,14 @@ public partial class LobbyScreen : Control
         var room = LobbyManager.Instance.CurrentRoom;
         if (room == null)
         {
+            _lastLifecycle = null;
             _roomLabel.Text = "No active room";
             _statusLabel.Text = "Join or host a room from the main menu.";
             return;
         }
+
+        var previousLifecycle = _lastLifecycle;
+        _lastLifecycle = room.MatchLifecycle;
 
         _roomLabel.Text = $"Room: {room.RoomName} | Host: {room.HostName} | State: {room.MatchLifecycle}";
         _statusLabel.Text = $"Players: {room.PlayerCount} | Spectators: {room.SpectatorCount}";
@@ -77,13 +109,19 @@ public partial class LobbyScreen : Control
         PopulateSeatOptions(room);
 
         var isHost = LobbyManager.Instance.IsHostAuthority;
-        GetNode<Button>("MarginContainer/VBoxContainer/Actions/StartMatchButton").Visible = isHost;
-        GetNode<Control>("MarginContainer/VBoxContainer/SeatsPanel").Visible = isHost;
+        _startMatchButton.Visible = isHost;
+        _startMatchButton.Disabled = !isHost;
+        _seatsPanel.Visible = isHost;
 
-        var canOpenGame = room.MatchLifecycle != RoomMatchLifecycle.Lobby;
-        GetNode<Button>("MarginContainer/VBoxContainer/Actions/OpenGameButton").Visible = canOpenGame;
+        foreach (var option in _seatOptions.Values)
+        {
+            option.Disabled = !isHost;
+        }
 
-        if (canOpenGame)
+        var shouldAutoOpenGame = room.MatchLifecycle != RoomMatchLifecycle.Lobby &&
+                                 (previousLifecycle == null || previousLifecycle == RoomMatchLifecycle.Lobby);
+
+        if (shouldAutoOpenGame)
         {
             GameManager.Instance?.LoadGameScene();
         }
@@ -143,15 +181,18 @@ public partial class LobbyScreen : Control
         SetStatus("Start match requested.");
     }
 
-    private void OnOpenGamePressed()
-    {
-        GameManager.Instance?.LoadGameScene();
-    }
-
-    private void OnLeavePressed()
+    private static void OnLeavePressed()
     {
         NetworkManager.Instance.DisconnectSession("Left room");
         GameManager.Instance?.LoadMainMenu();
+    }
+
+    private void OnServerEventReceived(string eventType, string payloadJson)
+    {
+        if (eventType == "PushMatchStarted")
+        {
+            GameManager.Instance?.LoadGameScene();
+        }
     }
 
     private void OnNetworkMessage(string message)

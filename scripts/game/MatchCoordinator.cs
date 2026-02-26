@@ -1,12 +1,17 @@
-using System;
 using Godot;
+using NetDex.Core.Commands;
+using NetDex.Core.Enums;
+using NetDex.Core.Rules;
+using NetDex.Networking;
+
+namespace NetDex.Lobby;
 
 public partial class MatchCoordinator : Node
 {
     public static MatchCoordinator Instance { get; private set; } = null!;
 
     private readonly IGameRulesEngine _rulesEngine = GameTypeRegistry.Resolve(GameType.Omi);
-    private OmiMatchState? _state;
+    private NetDex.Core.Models.OmiMatchState? _state;
     private OmiPhase _phaseBeforeReconnectPause = OmiPhase.TrickPlay;
 
     [Signal]
@@ -16,7 +21,6 @@ public partial class MatchCoordinator : Node
     public delegate void MatchInfoEventHandler(string message);
 
     public bool IsMatchRunning => _state != null && _state.Phase != OmiPhase.MatchEnd;
-    public bool HasState => _state != null;
 
     public override void _Ready()
     {
@@ -41,24 +45,23 @@ public partial class MatchCoordinator : Node
             return;
         }
 
-        var now = Time.GetUnixTimeFromSystem();
-        if (now < _state.ReconnectDeadlineUnixSeconds)
+        if (Time.GetUnixTimeFromSystem() < _state.ReconnectDeadlineUnixSeconds)
         {
             return;
         }
 
-        if (LobbyManager.Instance.CurrentRoom == null)
+        var room = LobbyManager.Instance.CurrentRoom;
+        if (room == null)
         {
             return;
         }
 
-        if (!LobbyManager.Instance.CurrentRoom.Participants.TryGetValue(_state.ReconnectPeerId.Value, out var participant) || !participant.Seat.HasValue)
+        if (!room.Participants.TryGetValue(_state.ReconnectPeerId.Value, out var participant) || !participant.Seat.HasValue)
         {
             return;
         }
 
-        var losingTeam = participant.Seat.Value.TeamIndex();
-        ApplyServerCommand(MatchCommand.ForfeitTeam(losingTeam));
+        ApplyServerCommand(MatchCommand.ForfeitTeam(participant.Seat.Value.TeamIndex()));
     }
 
     public bool ServerStartMatch(int requesterPeerId, out string error)
@@ -96,8 +99,7 @@ public partial class MatchCoordinator : Node
 
         _state = _rulesEngine.CreateInitialMatchState(hostSeat);
 
-        var seed = (int)GD.Randi();
-        var startResult = _rulesEngine.ApplyCommand(_state, MatchCommand.StartRound(seed));
+        var startResult = _rulesEngine.ApplyCommand(_state, MatchCommand.StartRound((int)GD.Randi()));
         if (!startResult.Success)
         {
             error = startResult.Error;
@@ -117,7 +119,6 @@ public partial class MatchCoordinator : Node
 
     public bool ServerHandleCutDeck(int peerId, int cutIndex, out string error)
     {
-        error = string.Empty;
         if (!TryResolveSeat(peerId, out var seat, out error))
         {
             return false;
@@ -128,7 +129,6 @@ public partial class MatchCoordinator : Node
 
     public bool ServerHandleSelectTrump(int peerId, CardSuit suit, out string error)
     {
-        error = string.Empty;
         if (!TryResolveSeat(peerId, out var seat, out error))
         {
             return false;
@@ -139,7 +139,6 @@ public partial class MatchCoordinator : Node
 
     public bool ServerHandlePlayCard(int peerId, string cardId, out string error)
     {
-        error = string.Empty;
         if (!TryResolveSeat(peerId, out var seat, out error))
         {
             return false;
@@ -162,7 +161,6 @@ public partial class MatchCoordinator : Node
         _state.Phase = OmiPhase.PausedReconnect;
 
         NetworkRpc.Instance.BroadcastPausedForReconnect(peerId, _state.ReconnectDeadlineUnixSeconds);
-
         LobbyManager.Instance.SetMatchLifecycle(RoomMatchLifecycle.PausedReconnect);
         LobbyManager.Instance.BroadcastRoomState();
         LobbyManager.Instance.BroadcastMatchSnapshotToAll();
@@ -208,8 +206,8 @@ public partial class MatchCoordinator : Node
             seat = resolvedSeat;
         }
 
-        var view = _rulesEngine.GetVisibleStateForPeer(_state, seat, role);
-        return MatchSnapshotSerializer.SerializeJson(view);
+        return NetDex.Core.Serialization.MatchSnapshotSerializer.SerializeJson(
+            _rulesEngine.GetVisibleStateForPeer(_state, seat, role));
     }
 
     private bool ApplyServerCommand(MatchCommand command)
@@ -265,7 +263,7 @@ public partial class MatchCoordinator : Node
         return true;
     }
 
-    private void PushEventNotifications(MatchCommandResult result)
+    private static void PushEventNotifications(MatchCommandResult result)
     {
         foreach (var matchEvent in result.Events)
         {
@@ -274,10 +272,6 @@ public partial class MatchCoordinator : Node
             {
                 case "round_started":
                     NetworkRpc.Instance.BroadcastMatchStarted(payloadJson);
-                    break;
-                case "deck_cut":
-                    break;
-                case "trump_selected":
                     break;
                 case "card_played":
                     NetworkRpc.Instance.BroadcastCardPlayed(payloadJson);

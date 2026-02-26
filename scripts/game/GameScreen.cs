@@ -1,6 +1,13 @@
 using System;
-using System.Collections.Generic;
 using Godot;
+using NetDex.Core.Enums;
+using NetDex.Core.Models;
+using NetDex.Core.Serialization;
+using NetDex.Lobby;
+using NetDex.Managers;
+using NetDex.Networking;
+
+namespace NetDex.UI.Game;
 
 public partial class GameScreen : Control
 {
@@ -39,9 +46,7 @@ public partial class GameScreen : Control
         _trumpOption = GetNode<OptionButton>("ActionPanel/VBoxContainer/TrumpOption");
         _actionButton = GetNode<Button>("ActionPanel/VBoxContainer/ActionButton");
 
-        var backButton = GetNode<Button>("BackLobbyButton");
-        backButton.Pressed += OnBackLobbyPressed;
-
+        GetNode<Button>("BackLobbyButton").Pressed += OnBackLobbyPressed;
         _actionButton.Pressed += OnActionButtonPressed;
 
         _trumpOption.Clear();
@@ -52,17 +57,17 @@ public partial class GameScreen : Control
 
         _cardScene = GD.Load<PackedScene>("res://scenes/game/Card.tscn");
 
-        _placeSounds = new AudioStreamOggVorbis[]
+        _placeSounds = new[]
         {
             GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardPlace1.ogg"),
             GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardPlace2.ogg"),
-            GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardPlace3.ogg"),
+            GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardPlace3.ogg")
         };
-        _slideSounds = new AudioStreamOggVorbis[]
+        _slideSounds = new[]
         {
             GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardSlide1.ogg"),
             GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardSlide2.ogg"),
-            GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardSlide3.ogg"),
+            GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardSlide3.ogg")
         };
 
         _sfxPlayer = new AudioStreamPlayer();
@@ -75,18 +80,24 @@ public partial class GameScreen : Control
         RenderSnapshot(LobbyManager.Instance.LocalMatchSnapshot);
     }
 
+    public override void _ExitTree()
+    {
+        if (LobbyManager.Instance != null)
+        {
+            LobbyManager.Instance.MatchSnapshotChanged -= OnMatchSnapshotChanged;
+            LobbyManager.Instance.RoomStateChanged -= OnRoomStateChanged;
+        }
+    }
+
     public override void _Input(InputEvent @event)
     {
-        if (@event.IsActionPressed("ui_cancel"))
+        if (@event.IsActionPressed("ui_cancel") && !HasNode("PauseMenu"))
         {
-            if (!HasNode("PauseMenu"))
-            {
-                var pauseMenuScene = GD.Load<PackedScene>("res://scenes/ui/PauseMenu.tscn");
-                var pauseMenu = pauseMenuScene.Instantiate<Control>();
-                pauseMenu.Name = "PauseMenu";
-                AddChild(pauseMenu);
-                pauseMenu.Show();
-            }
+            var pauseMenuScene = GD.Load<PackedScene>("res://scenes/ui/PauseMenu.tscn");
+            var pauseMenu = pauseMenuScene.Instantiate<Control>();
+            pauseMenu.Name = "PauseMenu";
+            AddChild(pauseMenu);
+            pauseMenu.Show();
         }
     }
 
@@ -127,35 +138,31 @@ public partial class GameScreen : Control
         var currentTurnSeat = SeatPosition.Bottom;
         if (snapshot.TryGetValue("currentTurnSeat", out var turnVariant))
         {
-            currentTurnSeat = SeatPositionExtensions.Parse(turnVariant.AsString()) ?? SeatPosition.Bottom;
+            currentTurnSeat = NetDex.Core.Enums.SeatPositionExtensions.Parse(turnVariant.AsString()) ?? SeatPosition.Bottom;
         }
 
-        var teamCreditsText = "10 - 10";
-        if (snapshot.TryGetValue("teamCredits", out var creditsVariant) && creditsVariant.VariantType == Variant.Type.Array)
-        {
-            var credits = creditsVariant.AsGodotArray();
-            if (credits.Count >= 2)
-            {
-                teamCreditsText = $"{credits[0].AsInt32()} - {credits[1].AsInt32()}";
-            }
-        }
-
-        var teamTricksText = "0 - 0";
-        if (snapshot.TryGetValue("teamTricks", out var tricksVariant) && tricksVariant.VariantType == Variant.Type.Array)
-        {
-            var tricks = tricksVariant.AsGodotArray();
-            if (tricks.Count >= 2)
-            {
-                teamTricksText = $"{tricks[0].AsInt32()} - {tricks[1].AsInt32()}";
-            }
-        }
+        var creditsText = ExtractPairText(snapshot, "teamCredits", "10", "10");
+        var tricksText = ExtractPairText(snapshot, "teamTricks", "0", "0");
 
         var trumpText = trumpSuit >= 0 ? ((CardSuit)trumpSuit).ToString() : "Not selected";
-        _statusLabel.Text = $"Round {roundNumber} | Phase: {phase} | Turn: {currentTurnSeat} | Trump: {trumpText} | Credits: {teamCreditsText} | Tricks: {teamTricksText}";
+        _statusLabel.Text = $"Round {roundNumber} | Phase: {phase} | Turn: {currentTurnSeat} | Trump: {trumpText} | Credits: {creditsText} | Tricks: {tricksText}";
 
         RenderHands(snapshot, phase, currentTurnSeat);
         RenderCurrentTrick(snapshot);
         RenderActionPanel(snapshot, phase);
+    }
+
+    private static string ExtractPairText(Godot.Collections.Dictionary snapshot, string key, string fallbackLeft, string fallbackRight)
+    {
+        if (!snapshot.TryGetValue(key, out var pairVariant) || pairVariant.VariantType != Variant.Type.Array)
+        {
+            return $"{fallbackLeft} - {fallbackRight}";
+        }
+
+        var pair = pairVariant.AsGodotArray();
+        return pair.Count >= 2
+            ? $"{pair[0].AsInt32()} - {pair[1].AsInt32()}"
+            : $"{fallbackLeft} - {fallbackRight}";
     }
 
     private void RenderHands(Godot.Collections.Dictionary snapshot, OmiPhase phase, SeatPosition currentTurnSeat)
@@ -171,14 +178,16 @@ public partial class GameScreen : Control
         foreach (SeatPosition seat in Enum.GetValues(typeof(SeatPosition)))
         {
             var container = GetHandContainer(seat);
-
             var visibleCards = new Godot.Collections.Array();
+
             if (visibleHands.TryGetValue(seat.ToString(), out var cardsVariant) && cardsVariant.VariantType == Variant.Type.Array)
             {
                 visibleCards = cardsVariant.AsGodotArray();
             }
 
-            var totalCount = handCounts.TryGetValue(seat.ToString(), out var countVariant) ? countVariant.AsInt32() : visibleCards.Count;
+            var totalCount = handCounts.TryGetValue(seat.ToString(), out var countVariant)
+                ? countVariant.AsInt32()
+                : visibleCards.Count;
 
             var isLocalPlayableSeat = _localSeat.HasValue && _localSeat.Value == seat && _localRole == ParticipantRole.Player;
             var canInteract = isLocalPlayableSeat && phase == OmiPhase.TrickPlay && currentTurnSeat == seat;
@@ -193,16 +202,14 @@ public partial class GameScreen : Control
                     }
 
                     var cardModel = CardModelConversions.FromDictionary(item.AsGodotDictionary());
-                    var card = CreateCard(cardModel, true, canInteract);
-                    container.AddChild(card);
+                    container.AddChild(CreateCard(cardModel, true, canInteract));
                 }
             }
             else
             {
                 for (var i = 0; i < totalCount; i++)
                 {
-                    var hidden = CreateCard(new CardModel($"hidden-{seat}-{i}", CardSuit.Spades, CardRank.Ace), false, false);
-                    container.AddChild(hidden);
+                    container.AddChild(CreateCard(new CardModel($"hidden-{seat}-{i}", CardSuit.Spades, CardRank.Ace), false, false));
                 }
             }
         }
@@ -225,7 +232,7 @@ public partial class GameScreen : Control
 
             var dict = item.AsGodotDictionary();
             var seat = dict.TryGetValue("seat", out var seatVariant)
-                ? SeatPositionExtensions.Parse(seatVariant.AsString()) ?? SeatPosition.Bottom
+                ? NetDex.Core.Enums.SeatPositionExtensions.Parse(seatVariant.AsString()) ?? SeatPosition.Bottom
                 : SeatPosition.Bottom;
 
             if (!dict.TryGetValue("card", out var cardVariant) || cardVariant.VariantType != Variant.Type.Dictionary)
@@ -249,11 +256,11 @@ public partial class GameScreen : Control
         }
 
         var cutterSeat = snapshot.TryGetValue("cutterSeat", out var cutterVariant)
-            ? SeatPositionExtensions.Parse(cutterVariant.AsString())
+            ? NetDex.Core.Enums.SeatPositionExtensions.Parse(cutterVariant.AsString())
             : null;
 
         var trumpSelectorSeat = snapshot.TryGetValue("trumpSelectorSeat", out var selectorVariant)
-            ? SeatPositionExtensions.Parse(selectorVariant.AsString())
+            ? NetDex.Core.Enums.SeatPositionExtensions.Parse(selectorVariant.AsString())
             : null;
 
         if (phase == OmiPhase.Cut && cutterSeat == _localSeat)
@@ -291,15 +298,13 @@ public partial class GameScreen : Control
 
         if (phase == OmiPhase.Cut)
         {
-            var cutIndex = GD.RandRange(1, 31);
-            NetworkRpc.Instance.SendCutDeckRequest(cutIndex);
+            NetworkRpc.Instance.SendCutDeckRequest(GD.RandRange(1, 31));
             return;
         }
 
         if (phase == OmiPhase.TrumpSelect)
         {
-            var suit = (CardSuit)_trumpOption.GetSelectedId();
-            NetworkRpc.Instance.SendSelectTrumpRequest(suit);
+            NetworkRpc.Instance.SendSelectTrumpRequest((CardSuit)_trumpOption.GetSelectedId());
         }
     }
 
@@ -319,7 +324,7 @@ public partial class GameScreen : Control
         PlaySound(_placeSounds);
     }
 
-    private void OnBackLobbyPressed()
+    private static void OnBackLobbyPressed()
     {
         GameManager.Instance?.LoadLobby();
     }
@@ -375,7 +380,6 @@ public partial class GameScreen : Control
     private Vector2 GetDeskCardPosition(SeatPosition seat, Vector2 cardSize)
     {
         var center = _desk.Size / 2f - cardSize / 2f;
-
         return seat switch
         {
             SeatPosition.Bottom => center + new Vector2(0, 110),

@@ -1,4 +1,8 @@
 using Godot;
+using NetDex.Core.Enums;
+using NetDex.Lobby;
+
+namespace NetDex.Networking;
 
 public partial class NetworkRpc : Node
 {
@@ -38,8 +42,7 @@ public partial class NetworkRpc : Node
     {
         if (Multiplayer.IsServer())
         {
-            var peerId = Multiplayer.GetUniqueId();
-            LobbyManager.Instance.ServerHandleSeatChange(peerId, targetSeat, targetPeerId, out _);
+            LobbyManager.Instance.ServerHandleSeatChange(Multiplayer.GetUniqueId(), targetSeat, targetPeerId, out _);
             return;
         }
 
@@ -126,8 +129,7 @@ public partial class NetworkRpc : Node
         }
 
         var sender = (int)Multiplayer.GetRemoteSenderId();
-        var seat = (SeatPosition)targetSeat;
-        var ok = LobbyManager.Instance.ServerHandleSeatChange(sender, seat, targetPeerId, out var error);
+        var ok = LobbyManager.Instance.ServerHandleSeatChange(sender, (SeatPosition)targetSeat, targetPeerId, out var error);
         if (!ok)
         {
             RpcId(sender, nameof(PushServerMessage), error);
@@ -272,6 +274,7 @@ public partial class NetworkRpc : Node
             ["disconnectedPeerId"] = disconnectedPeerId,
             ["reconnectDeadlineUnixSeconds"] = reconnectDeadlineUnixSeconds
         };
+
         EmitSignal(SignalName.ServerEventReceived, "PushPausedForReconnect", Json.Stringify(payload));
     }
 
@@ -287,7 +290,7 @@ public partial class NetworkRpc : Node
         LobbyManager.Instance.ApplyRemoteMatchSnapshot(snapshotJson);
     }
 
-    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = false, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     public void PushServerMessage(string message)
     {
         EmitSignal(SignalName.ServerMessage, message);
@@ -297,6 +300,17 @@ public partial class NetworkRpc : Node
     {
         Rpc(nameof(PushRoomSnapshot), snapshotJson);
         Rpc(nameof(PushSeatMap), snapshotJson);
+    }
+
+    public void SendRoomSnapshot(int peerId, string snapshotJson)
+    {
+        if (peerId == Multiplayer.GetUniqueId())
+        {
+            LobbyManager.Instance.ApplyRemoteRoomSnapshot(snapshotJson);
+            return;
+        }
+
+        RpcId(peerId, nameof(PushRoomSnapshot), snapshotJson);
     }
 
     public void SendMatchSnapshot(int peerId, string snapshotJson)
@@ -365,5 +379,10 @@ public partial class NetworkRpc : Node
     public void BroadcastMatchEnded(string payloadJson)
     {
         Rpc(nameof(PushMatchEnded), payloadJson);
+    }
+
+    public void BroadcastServerMessage(string message)
+    {
+        Rpc(nameof(PushServerMessage), message);
     }
 }

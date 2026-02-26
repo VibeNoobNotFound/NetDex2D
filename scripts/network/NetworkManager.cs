@@ -1,16 +1,25 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using Godot;
+using NetDex.Core.Enums;
+using NetDex.Lobby;
+using NetDex.Managers;
+using NetDex.Networking.Stores;
+
+namespace NetDex.Networking;
 
 public partial class NetworkManager : Node
 {
     public const int GamePort = 7777;
     public const int DiscoveryPort = 7778;
+    public const int DiscoveryProtocolVersion = 1;
     public const double ReconnectTimeoutSeconds = 90.0;
     public const int MaxSpectators = 32;
     public const int MaxPlayers = 4;
+
+    private const double DiscoveryExpirySeconds = 6.0;
+    private const double DiscoveryUiThrottleSeconds = 0.25;
 
     public static NetworkManager Instance { get; private set; } = null!;
 
@@ -20,10 +29,14 @@ public partial class NetworkManager : Node
     private Timer? _advertiseTimer;
     private Timer? _discoveryPollTimer;
 
-    private readonly Dictionary<string, RoomAdvertisement> _discoveredRooms = new();
+    private readonly IDiscoveryStore _discoveryStore = new DiscoveryStore();
 
     private string _pendingPlayerName = "Player";
     private ParticipantRole _pendingRole = ParticipantRole.Player;
+
+    private bool _discoveryDirty;
+    private string _lastDiscoveryFingerprint = string.Empty;
+    private double _lastDiscoveryUiPublishUnix;
 
     [Signal]
     public delegate void DiscoveryUpdatedEventHandler();
@@ -85,9 +98,12 @@ public partial class NetworkManager : Node
 
     public IReadOnlyList<RoomAdvertisement> GetDiscoveredRooms()
     {
-        return _discoveredRooms.Values
-            .OrderByDescending(room => room.LastSeenUnixSeconds)
-            .ToList();
+        return _discoveryStore.GetAll();
+    }
+
+    public void ForceDiscoveryRefreshSignal()
+    {
+        EmitSignal(SignalName.DiscoveryUpdated);
     }
 
     public string GetSavedPlayerName()
@@ -183,9 +199,16 @@ public partial class NetworkManager : Node
 
     public void DisconnectSession(string reason = "Disconnected", bool notifyServer = true)
     {
-        if (notifyServer && Multiplayer.MultiplayerPeer != null && !Multiplayer.IsServer())
+        if (notifyServer && Multiplayer.MultiplayerPeer != null)
         {
-            NetworkRpc.Instance.SendLeaveRoomRequest();
+            if (Multiplayer.IsServer())
+            {
+                NetworkRpc.Instance.BroadcastServerMessage(reason);
+            }
+            else
+            {
+                NetworkRpc.Instance.SendLeaveRoomRequest();
+            }
         }
 
         if (Multiplayer.MultiplayerPeer is ENetMultiplayerPeer enetPeer)
@@ -232,6 +255,10 @@ public partial class NetworkManager : Node
             _discoveryReceiver.Close();
             _discoveryReceiver = null;
         }
+
+        _discoveryStore.Clear();
+        _discoveryDirty = true;
+        PublishDiscoveryIfNeeded(force: true);
     }
 
     private void StartAdvertising()
@@ -282,27 +309,47 @@ public partial class NetworkManager : Node
             dict["lastSeen"] = Time.GetUnixTimeFromSystem();
 
             var advertisement = RoomAdvertisement.FromDictionary(dict);
-            var key = $"{advertisement.HostAddress}:{advertisement.Port}:{advertisement.RoomName}";
-            _discoveredRooms[key] = advertisement;
-            changed = true;
+            if (advertisement.ProtocolVersion != DiscoveryProtocolVersion)
+            {
+                continue;
+            }
+
+            changed |= _discoveryStore.Upsert(advertisement);
         }
 
         var now = Time.GetUnixTimeFromSystem();
-        var expiredKeys = _discoveredRooms
-            .Where(pair => now - pair.Value.LastSeenUnixSeconds > 3.2)
-            .Select(pair => pair.Key)
-            .ToList();
-
-        foreach (var key in expiredKeys)
-        {
-            _discoveredRooms.Remove(key);
-            changed = true;
-        }
+        changed |= _discoveryStore.RemoveExpired(now, DiscoveryExpirySeconds);
 
         if (changed)
         {
+            _discoveryDirty = true;
+        }
+
+        PublishDiscoveryIfNeeded();
+    }
+
+    private void PublishDiscoveryIfNeeded(bool force = false)
+    {
+        if (!_discoveryDirty && !force)
+        {
+            return;
+        }
+
+        var now = Time.GetUnixTimeFromSystem();
+        if (!force && now - _lastDiscoveryUiPublishUnix < DiscoveryUiThrottleSeconds)
+        {
+            return;
+        }
+
+        var fingerprint = _discoveryStore.ComputeFingerprint();
+        if (force || fingerprint != _lastDiscoveryFingerprint)
+        {
+            _lastDiscoveryFingerprint = fingerprint;
             EmitSignal(SignalName.DiscoveryUpdated);
         }
+
+        _discoveryDirty = false;
+        _lastDiscoveryUiPublishUnix = now;
     }
 
     private void OnAdvertiseTimerTimeout()

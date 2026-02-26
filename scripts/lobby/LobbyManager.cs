@@ -1,7 +1,12 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using NetDex.Core.Enums;
+using NetDex.Core.Serialization;
+using NetDex.Lobby.Stores;
+using NetDex.Networking;
+
+namespace NetDex.Lobby;
 
 public partial class LobbyManager : Node
 {
@@ -16,9 +21,11 @@ public partial class LobbyManager : Node
     [Signal]
     public delegate void InfoMessageEventHandler(string message);
 
-    public RoomState? CurrentRoom { get; private set; }
+    private readonly IRoomStateStore _roomStore = new RoomStateStore();
+    private readonly IMatchStateStore _matchStateStore = new MatchStateStore();
 
-    public Godot.Collections.Dictionary LocalMatchSnapshot { get; private set; } = new();
+    public RoomState? CurrentRoom => _roomStore.Current;
+    public Godot.Collections.Dictionary LocalMatchSnapshot => _matchStateStore.Snapshot;
 
     public override void _Ready()
     {
@@ -42,12 +49,7 @@ public partial class LobbyManager : Node
                 return false;
             }
 
-            if (!Multiplayer.IsServer())
-            {
-                return false;
-            }
-
-            return CurrentRoom.HostPeerId == Multiplayer.GetUniqueId();
+            return Multiplayer.IsServer() && CurrentRoom.HostPeerId == Multiplayer.GetUniqueId();
         }
     }
 
@@ -59,12 +61,9 @@ public partial class LobbyManager : Node
         }
 
         var peerId = Multiplayer.GetUniqueId();
-        if (CurrentRoom.Participants.TryGetValue(peerId, out var participant))
-        {
-            return participant.Role;
-        }
-
-        return ParticipantRole.Spectator;
+        return CurrentRoom.Participants.TryGetValue(peerId, out var participant)
+            ? participant.Role
+            : ParticipantRole.Spectator;
     }
 
     public SeatPosition? GetLocalSeat()
@@ -75,17 +74,9 @@ public partial class LobbyManager : Node
         }
 
         var peerId = Multiplayer.GetUniqueId();
-        return CurrentRoom.Participants.TryGetValue(peerId, out var participant) ? participant.Seat : null;
-    }
-
-    public ParticipantInfo? GetParticipant(int peerId)
-    {
-        if (CurrentRoom == null)
-        {
-            return null;
-        }
-
-        return CurrentRoom.Participants.TryGetValue(peerId, out var participant) ? participant : null;
+        return CurrentRoom.Participants.TryGetValue(peerId, out var participant)
+            ? participant.Seat
+            : null;
     }
 
     public void CreateHostedRoom(string roomName, string hostName, string reconnectToken)
@@ -94,11 +85,12 @@ public partial class LobbyManager : Node
         var sanitizedHostName = SanitizePlayerName(hostName);
         var hostPeerId = Multiplayer.GetUniqueId();
 
-        CurrentRoom = new RoomState
+        var room = new RoomState
         {
             RoomName = sanitizedRoomName,
             HostName = sanitizedHostName,
             HostPeerId = hostPeerId,
+            RoomInstanceId = Guid.NewGuid().ToString("N"),
             GameType = GameType.Omi,
             MatchLifecycle = RoomMatchLifecycle.Lobby
         };
@@ -114,10 +106,11 @@ public partial class LobbyManager : Node
             Seat = SeatPosition.Bottom
         };
 
-        CurrentRoom.Participants[hostPeerId] = hostParticipant;
-        CurrentRoom.SetSeat(SeatPosition.Bottom, hostPeerId);
+        room.Participants[hostPeerId] = hostParticipant;
+        room.SetSeat(SeatPosition.Bottom, hostPeerId);
 
-        LocalMatchSnapshot = new Godot.Collections.Dictionary();
+        _roomStore.Set(room);
+        _matchStateStore.Clear();
 
         EmitSignal(SignalName.RoomStateChanged);
         EmitSignal(SignalName.InfoMessage, $"Room '{sanitizedRoomName}' created");
@@ -125,8 +118,8 @@ public partial class LobbyManager : Node
 
     public void LeaveRoomLocally(string reason = "Left room")
     {
-        CurrentRoom = null;
-        LocalMatchSnapshot = new Godot.Collections.Dictionary();
+        _roomStore.Clear();
+        _matchStateStore.Clear();
         EmitSignal(SignalName.RoomStateChanged);
         EmitSignal(SignalName.MatchSnapshotChanged);
         EmitSignal(SignalName.InfoMessage, reason);
@@ -142,9 +135,10 @@ public partial class LobbyManager : Node
             return false;
         }
 
+        var room = CurrentRoom;
         var sanitizedName = SanitizePlayerName(playerName);
 
-        var reconnectCandidate = CurrentRoom.Participants.Values
+        var reconnectCandidate = room.Participants.Values
             .FirstOrDefault(participant =>
                 !participant.IsConnected &&
                 !string.IsNullOrWhiteSpace(reconnectToken) &&
@@ -152,19 +146,19 @@ public partial class LobbyManager : Node
 
         if (reconnectCandidate != null)
         {
-            CurrentRoom.Participants.Remove(reconnectCandidate.PeerId);
+            room.Participants.Remove(reconnectCandidate.PeerId);
 
             var previousPeerId = reconnectCandidate.PeerId;
             reconnectCandidate.PeerId = peerId;
             reconnectCandidate.Name = sanitizedName;
             reconnectCandidate.IsConnected = true;
-            CurrentRoom.Participants[peerId] = reconnectCandidate;
+            room.Participants[peerId] = reconnectCandidate;
 
-            foreach (var seat in CurrentRoom.SeatAssignments.Keys.ToList())
+            foreach (var seat in room.SeatAssignments.Keys.ToList())
             {
-                if (CurrentRoom.SeatAssignments[seat] == previousPeerId)
+                if (room.SeatAssignments[seat] == previousPeerId)
                 {
-                    CurrentRoom.SeatAssignments[seat] = peerId;
+                    room.SeatAssignments[seat] = peerId;
                 }
             }
 
@@ -173,16 +167,21 @@ public partial class LobbyManager : Node
                 MatchCoordinator.Instance.ServerHandlePlayerReconnected(peerId);
             }
 
+            var reconnectSnapshot = BuildRoomSnapshotJson();
+            NetworkRpc.Instance.SendRoomSnapshot(peerId, reconnectSnapshot);
             BroadcastRoomState();
             return true;
         }
 
-        if (CurrentRoom.Participants.ContainsKey(peerId))
+        if (room.Participants.ContainsKey(peerId))
         {
-            var existing = CurrentRoom.Participants[peerId];
+            var existing = room.Participants[peerId];
             existing.Name = sanitizedName;
             existing.IsConnected = true;
             existing.Role = requestedRole;
+
+            var existingSnapshot = BuildRoomSnapshotJson();
+            NetworkRpc.Instance.SendRoomSnapshot(peerId, existingSnapshot);
             BroadcastRoomState();
             return true;
         }
@@ -198,14 +197,14 @@ public partial class LobbyManager : Node
             Seat = null
         };
 
-        CurrentRoom.Participants[peerId] = participant;
+        room.Participants[peerId] = participant;
 
-        if (!CurrentRoom.IsMatchRunning && requestedRole == ParticipantRole.Player)
+        if (!room.IsMatchRunning && requestedRole == ParticipantRole.Player)
         {
-            var firstSeat = CurrentRoom.FirstEmptySeat();
+            var firstSeat = room.FirstEmptySeat();
             if (firstSeat.HasValue)
             {
-                CurrentRoom.SetSeat(firstSeat.Value, peerId);
+                room.SetSeat(firstSeat.Value, peerId);
             }
             else
             {
@@ -213,6 +212,8 @@ public partial class LobbyManager : Node
             }
         }
 
+        var snapshot = BuildRoomSnapshotJson();
+        NetworkRpc.Instance.SendRoomSnapshot(peerId, snapshot);
         BroadcastRoomState();
         return true;
     }
@@ -345,24 +346,21 @@ public partial class LobbyManager : Node
     public void ApplyRemoteRoomSnapshot(string snapshotJson)
     {
         var dict = ParseSnapshotJson(snapshotJson);
-        CurrentRoom = RoomState.FromSnapshotDictionary(dict);
+        _roomStore.Set(RoomState.FromSnapshotDictionary(dict));
         EmitSignal(SignalName.RoomStateChanged);
     }
 
     public void ApplyRemoteMatchSnapshot(string snapshotJson)
     {
-        LocalMatchSnapshot = MatchSnapshotSerializer.ParseJson(snapshotJson);
+        _matchStateStore.Set(MatchSnapshotSerializer.ParseJson(snapshotJson));
         EmitSignal(SignalName.MatchSnapshotChanged);
     }
 
     public string BuildRoomSnapshotJson(bool includeReconnectToken = false)
     {
-        if (CurrentRoom == null)
-        {
-            return "{}";
-        }
-
-        return Json.Stringify(CurrentRoom.ToSnapshotDictionary(includeReconnectToken));
+        return CurrentRoom == null
+            ? "{}"
+            : Json.Stringify(CurrentRoom.ToSnapshotDictionary(includeReconnectToken));
     }
 
     public RoomAdvertisement BuildAdvertisement(string hostAddress)
@@ -378,7 +376,9 @@ public partial class LobbyManager : Node
                 0,
                 RoomMatchLifecycle.Lobby.ToString(),
                 hostAddress,
-                Time.GetUnixTimeFromSystem());
+                Time.GetUnixTimeFromSystem(),
+                string.Empty,
+                NetworkManager.DiscoveryProtocolVersion);
         }
 
         return new RoomAdvertisement(
@@ -390,7 +390,9 @@ public partial class LobbyManager : Node
             CurrentRoom.SpectatorCount,
             CurrentRoom.MatchLifecycle.ToString(),
             hostAddress,
-            Time.GetUnixTimeFromSystem());
+            Time.GetUnixTimeFromSystem(),
+            CurrentRoom.RoomInstanceId,
+            NetworkManager.DiscoveryProtocolVersion);
     }
 
     public void BroadcastRoomState()
@@ -436,7 +438,8 @@ public partial class LobbyManager : Node
         var localPeerId = Multiplayer.GetUniqueId();
         if (CurrentRoom.Participants.TryGetValue(localPeerId, out var localParticipant))
         {
-            ApplyRemoteMatchSnapshot(MatchCoordinator.Instance.BuildSnapshotForPeer(localPeerId, localParticipant.Role));
+            _matchStateStore.Set(MatchSnapshotSerializer.ParseJson(MatchCoordinator.Instance.BuildSnapshotForPeer(localPeerId, localParticipant.Role)));
+            EmitSignal(SignalName.MatchSnapshotChanged);
         }
     }
 

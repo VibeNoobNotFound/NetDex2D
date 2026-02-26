@@ -1,0 +1,67 @@
+[gd_scene format=3 uid="uid://hostscreen"]
+
+[ext_resource type="Script" path="res://scripts/ui/main/HostScreen.cs" id="1_host"]
+
+[node name="HostScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_host")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.08, 0.2, 0.32, 1)
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MainPanel" type="PanelContainer" parent="CenterContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(520, 420)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/MainPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+text = "Host Room"
+horizontal_alignment = 1
+
+[node name="PlayerNameInput" type="LineEdit" parent="CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+placeholder_text = "Player Name"
+
+[node name="RoomNameInput" type="LineEdit" parent="CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+placeholder_text = "Room Name"
+text = "My Omi Room"
+
+[node name="CreateHostButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "Create and Open Lobby"
+
+[node name="BackButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Back"
+
+[node name="StatusLabel" type="Label" parent="CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "Ready"
+autowrap_mode = 2

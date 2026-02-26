@@ -144,11 +144,6 @@ custom_minimum_size = Vector2(180, 42)
 layout_mode = 2
 text = "Start Match"
 
-[node name="OpenGameButton" type="Button" parent="MarginContainer/VBoxContainer/Actions"]
-custom_minimum_size = Vector2(180, 42)
-layout_mode = 2
-text = "Open Table"
-
 [node name="LeaveRoomButton" type="Button" parent="MarginContainer/VBoxContainer/Actions"]
 custom_minimum_size = Vector2(180, 42)
 layout_mode = 2

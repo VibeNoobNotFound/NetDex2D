@@ -1,13 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Godot;
+using NetDex.Core.Commands;
+using NetDex.Core.Enums;
+using NetDex.Core.Models;
+using NetDex.Core.Serialization;
+
+namespace NetDex.Core.Rules;
 
 public sealed class OmiRulesEngine : IGameRulesEngine
 {
     public OmiMatchState CreateInitialMatchState(SeatPosition hostSeat, int initialCredits = 10)
     {
-        var state = new OmiMatchState
+        return new OmiMatchState
         {
             GameType = GameType.Omi,
             Phase = OmiPhase.LobbySeating,
@@ -16,8 +21,6 @@ public sealed class OmiRulesEngine : IGameRulesEngine
             CurrentStake = 1,
             TeamCredits = new[] { initialCredits, initialCredits }
         };
-
-        return state;
     }
 
     public MatchCommandResult ApplyCommand(OmiMatchState state, MatchCommand command)
@@ -75,14 +78,12 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         state.CurrentTurnSeat = state.CutterSeat;
 
         state.Phase = OmiPhase.Shuffle;
-
-        var baseDeck = DeckService.BuildOmiDeck();
-        state.Deck = DeckService.Shuffle(baseDeck, seed);
+        state.Deck = DeckService.Shuffle(DeckService.BuildOmiDeck(), seed);
         state.DeckCursor = 0;
 
         state.Phase = OmiPhase.Cut;
 
-        var started = new MatchEvent
+        return MatchCommandResult.Ok(new MatchEvent
         {
             Type = "round_started",
             Payload = new Godot.Collections.Dictionary
@@ -93,9 +94,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
                 ["trumpSelectorSeat"] = state.TrumpSelectorSeat.ToString(),
                 ["phase"] = (int)state.Phase
             }
-        };
-
-        return MatchCommandResult.Ok(started);
+        });
     }
 
     private static MatchCommandResult CutDeck(OmiMatchState state, MatchCommand command)
@@ -119,7 +118,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         state.Phase = OmiPhase.TrumpSelect;
         state.CurrentTurnSeat = state.TrumpSelectorSeat;
 
-        var cutEvent = new MatchEvent
+        return MatchCommandResult.Ok(new MatchEvent
         {
             Type = "deck_cut",
             Payload = new Godot.Collections.Dictionary
@@ -127,9 +126,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
                 ["cutIndex"] = command.CutIndex,
                 ["phase"] = (int)state.Phase
             }
-        };
-
-        return MatchCommandResult.Ok(cutEvent);
+        });
     }
 
     private static MatchCommandResult SelectTrump(OmiMatchState state, MatchCommand command)
@@ -145,14 +142,13 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         }
 
         state.TrumpSuit = command.TrumpSuit;
-
         state.Phase = OmiPhase.SecondDeal;
         DealCardsRoundRobin(state, state.TrumpSelectorSeat, 4);
 
         state.Phase = OmiPhase.TrickPlay;
         state.CurrentTurnSeat = state.TrumpSelectorSeat;
 
-        var trumpEvent = new MatchEvent
+        return MatchCommandResult.Ok(new MatchEvent
         {
             Type = "trump_selected",
             Payload = new Godot.Collections.Dictionary
@@ -161,9 +157,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
                 ["phase"] = (int)state.Phase,
                 ["startingSeat"] = state.CurrentTurnSeat.ToString()
             }
-        };
-
-        return MatchCommandResult.Ok(trumpEvent);
+        });
     }
 
     private static MatchCommandResult PlayCard(OmiMatchState state, MatchCommand command)
@@ -402,11 +396,10 @@ public sealed class OmiRulesEngine : IGameRulesEngine
             candidateCards = trickCards.Where(card => card.Card.Suit == leadSuit);
         }
 
-        var winner = candidateCards
+        return candidateCards
             .OrderByDescending(card => card.Card.Strength)
-            .First();
-
-        return winner.Seat;
+            .First()
+            .Seat;
     }
 
     private static void DealCardsRoundRobin(OmiMatchState state, SeatPosition startSeat, int cardsPerSeat)

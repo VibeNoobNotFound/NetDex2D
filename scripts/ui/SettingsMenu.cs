@@ -1,4 +1,7 @@
 using Godot;
+using NetDex.Managers;
+
+namespace NetDex.UI.Main;
 
 public partial class SettingsMenu : Control
 {
@@ -10,16 +13,13 @@ public partial class SettingsMenu : Control
     {
         var vbox = GetNode<VBoxContainer>("CenterContainer/VBoxContainer");
 
-        // Back button
         var backBtn = vbox.GetNode<Button>("BackButton");
         backBtn.Pressed += OnBackPressed;
 
-        // Display controls
         _fullscreenToggle = vbox.GetNode<CheckButton>("FullscreenToggle");
         _resolutionSlider = vbox.GetNode<HSlider>("ResolutionSlider");
         _qualityLabel = vbox.GetNode<Label>("QualityLabel");
 
-        // Platform check: hide display controls on mobile
         string platform = OS.GetName();
         bool isMobile = platform == "Android" || platform == "iOS";
 
@@ -29,14 +29,11 @@ public partial class SettingsMenu : Control
         vbox.GetNode<HSeparator>("HSeparator2").Visible = !isMobile;
         vbox.GetNode<HSeparator>("HSeparator3").Visible = !isMobile;
 
-        // Quality slider is always visible
         _qualityLabel.Visible = true;
         _resolutionSlider.Visible = true;
 
-        // Load saved settings
         LoadSettings();
 
-        // Connect signals
         _fullscreenToggle.Toggled += OnFullscreenToggled;
         _resolutionSlider.ValueChanged += OnQualitySliderChanged;
     }
@@ -57,8 +54,7 @@ public partial class SettingsMenu : Control
     private void OnQualitySliderChanged(double value)
     {
         _qualityLabel.Text = $"Render Quality: {(int)value}%";
-        float scale = (float)(value / 100.0);
-        GetWindow().ContentScaleFactor = scale;
+        GetWindow().ContentScaleFactor = (float)(value / 100.0);
         SaveSettings();
     }
 
@@ -77,7 +73,6 @@ public partial class SettingsMenu : Control
         if (err != Error.Ok)
             return;
 
-        // Fullscreen
         bool fullscreen = (bool)config.GetValue("display", "fullscreen", false);
         _fullscreenToggle.SetPressedNoSignal(fullscreen);
         if (fullscreen)
@@ -85,14 +80,13 @@ public partial class SettingsMenu : Control
             DisplayServer.WindowSetMode(DisplayServer.WindowMode.ExclusiveFullscreen);
         }
 
-        // Quality
         double quality = (double)config.GetValue("display", "quality", 100.0);
         _resolutionSlider.SetValueNoSignal(quality);
         _qualityLabel.Text = $"Render Quality: {(int)quality}%";
         GetWindow().ContentScaleFactor = (float)(quality / 100.0);
     }
 
-    private void OnBackPressed()
+    private static void OnBackPressed()
     {
         GameManager.Instance?.LoadMainMenu();
     }

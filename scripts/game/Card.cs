@@ -1,5 +1,6 @@
 using Godot;
-using System;
+
+namespace NetDex.UI.Game;
 
 public partial class Card : Control
 {
@@ -17,11 +18,9 @@ public partial class Card : Control
 
     private TextureRect _textureRect = null!;
 
-    // Spritesheet references
     private static Texture2D _cardSheet = null!;
     private static Texture2D _backSheet = null!;
 
-    // Card dimensions in the spritesheet
     private const int CardWidth = 140;
     private const int CardHeight = 190;
 
@@ -29,7 +28,6 @@ public partial class Card : Control
     {
         _textureRect = GetNode<TextureRect>("TextureRect");
 
-        // Load spritesheets once
         _cardSheet ??= GD.Load<Texture2D>("res://assets/spritesheets/playingCards.png");
         _backSheet ??= GD.Load<Texture2D>("res://assets/spritesheets/playingCardBacks.png");
 
@@ -45,15 +43,11 @@ public partial class Card : Control
         Rank = rank;
         IsFaceUp = isFaceUp;
         CardId = cardId;
+
         if (IsInsideTree())
         {
             UpdateVisuals();
         }
-    }
-
-    public void SetInteractable(bool interactable)
-    {
-        IsInteractable = interactable;
     }
 
     public void SetFaceUp(bool faceUp)
@@ -62,35 +56,42 @@ public partial class Card : Control
         UpdateVisuals();
     }
 
+    public void SetInteractable(bool interactable)
+    {
+        IsInteractable = interactable;
+    }
+
     private void UpdateVisuals()
     {
-        if (_textureRect == null) return;
+        if (_textureRect == null)
+        {
+            return;
+        }
 
         if (IsFaceUp)
         {
-            var region = GetCardRegion(Suit, Rank);
-            var atlas = new AtlasTexture();
-            atlas.Atlas = _cardSheet;
-            atlas.Region = region;
+            var atlas = new AtlasTexture
+            {
+                Atlas = _cardSheet,
+                Region = GetCardRegion(Suit, Rank)
+            };
+
             _textureRect.Texture = atlas;
         }
         else
         {
-            // Use blue card back (cardBack_blue1: x=140, y=380)
-            var atlas = new AtlasTexture();
-            atlas.Atlas = _backSheet;
-            atlas.Region = new Rect2(140, 380, CardWidth, CardHeight);
+            var atlas = new AtlasTexture
+            {
+                Atlas = _backSheet,
+                Region = new Rect2(140, 380, CardWidth, CardHeight)
+            };
+
             _textureRect.Texture = atlas;
         }
     }
 
-    /// <summary>
-    /// Returns the region rect in the playingCards.png spritesheet for a given suit/rank.
-    /// Positions are from the XML atlas file.
-    /// </summary>
     private static Rect2 GetCardRegion(SuitType suit, RankType rank)
     {
-        // Build the lookup name matching the XML: e.g. "cardHeartsA", "cardClubs10"
         string suitName = suit switch
         {
             SuitType.Hearts => "Hearts",
@@ -109,12 +110,8 @@ public partial class Card : Control
             _ => ((int)rank).ToString()
         };
 
-        string key = $"card{suitName}{rankName}";
-
-        // Atlas positions from playingCards.xml
-        return key switch
+        return $"card{suitName}{rankName}" switch
         {
-            // Clubs
             "cardClubs7" => new Rect2(560, 1330, CardWidth, CardHeight),
             "cardClubs8" => new Rect2(560, 1140, CardWidth, CardHeight),
             "cardClubs9" => new Rect2(560, 950, CardWidth, CardHeight),
@@ -124,7 +121,6 @@ public partial class Card : Control
             "cardClubsK" => new Rect2(560, 190, CardWidth, CardHeight),
             "cardClubsA" => new Rect2(560, 570, CardWidth, CardHeight),
 
-            // Diamonds
             "cardDiamonds7" => new Rect2(420, 760, CardWidth, CardHeight),
             "cardDiamonds8" => new Rect2(420, 570, CardWidth, CardHeight),
             "cardDiamonds9" => new Rect2(420, 380, CardWidth, CardHeight),
@@ -134,7 +130,6 @@ public partial class Card : Control
             "cardDiamondsK" => new Rect2(280, 1520, CardWidth, CardHeight),
             "cardDiamondsA" => new Rect2(420, 0, CardWidth, CardHeight),
 
-            // Hearts
             "cardHearts7" => new Rect2(280, 190, CardWidth, CardHeight),
             "cardHearts8" => new Rect2(280, 0, CardWidth, CardHeight),
             "cardHearts9" => new Rect2(140, 1710, CardWidth, CardHeight),
@@ -144,7 +139,6 @@ public partial class Card : Control
             "cardHeartsK" => new Rect2(140, 950, CardWidth, CardHeight),
             "cardHeartsA" => new Rect2(140, 1330, CardWidth, CardHeight),
 
-            // Spades
             "cardSpades7" => new Rect2(0, 1330, CardWidth, CardHeight),
             "cardSpades8" => new Rect2(0, 1140, CardWidth, CardHeight),
             "cardSpades9" => new Rect2(0, 950, CardWidth, CardHeight),
@@ -154,7 +148,7 @@ public partial class Card : Control
             "cardSpadesK" => new Rect2(0, 190, CardWidth, CardHeight),
             "cardSpadesA" => new Rect2(0, 570, CardWidth, CardHeight),
 
-            _ => new Rect2(0, 0, CardWidth, CardHeight) // fallback
+            _ => new Rect2(0, 0, CardWidth, CardHeight)
         };
     }
 
