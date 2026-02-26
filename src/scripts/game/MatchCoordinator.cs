@@ -1,6 +1,8 @@
 using Godot;
+using NetDex.AI;
 using NetDex.Core.Commands;
 using NetDex.Core.Enums;
+using NetDex.Core.Models;
 using NetDex.Core.Rules;
 using NetDex.Networking;
 
@@ -11,8 +13,9 @@ public partial class MatchCoordinator : Node
     public static MatchCoordinator Instance { get; private set; } = null!;
 
     private readonly IGameRulesEngine _rulesEngine = GameTypeRegistry.Resolve(GameType.Omi);
-    private NetDex.Core.Models.OmiMatchState? _state;
+    private OmiMatchState? _state;
     private OmiPhase _phaseBeforeReconnectPause = OmiPhase.TrickPlay;
+    public int StateVersion { get; private set; }
 
     [Signal]
     public delegate void MatchStateAdvancedEventHandler();
@@ -87,6 +90,11 @@ public partial class MatchCoordinator : Node
             return false;
         }
 
+        if (!LobbyManager.Instance.ServerPreparePlayersForMatch(out error))
+        {
+            return false;
+        }
+
         if (!LobbyManager.Instance.ServerCanStartMatch(out error))
         {
             return false;
@@ -98,6 +106,7 @@ public partial class MatchCoordinator : Node
         }
 
         _state = _rulesEngine.CreateInitialMatchState(hostSeat);
+        StateVersion += 1;
 
         var startResult = _rulesEngine.ApplyCommand(_state, MatchCommand.StartRound((int)GD.Randi()));
         if (!startResult.Success)
@@ -115,6 +124,16 @@ public partial class MatchCoordinator : Node
 
         EmitSignal(SignalName.MatchStateAdvanced);
         return true;
+    }
+
+    public OmiMatchState? GetAuthoritativeState()
+    {
+        if (!Multiplayer.IsServer())
+        {
+            return null;
+        }
+
+        return _state;
     }
 
     public bool ServerHandleCutDeck(int peerId, int cutIndex, out string error)
@@ -167,6 +186,50 @@ public partial class MatchCoordinator : Node
         return ApplyServerCommand(MatchCommand.PlayCard(seat, peerId, cardId), out error);
     }
 
+    public bool ServerHandleAiCommand(MatchCommand command, out string error)
+    {
+        error = string.Empty;
+
+        if (!Multiplayer.IsServer())
+        {
+            error = "Only server can submit AI command";
+            return false;
+        }
+
+        if (_state == null)
+        {
+            error = "Match state is not initialized";
+            return false;
+        }
+
+        if (!command.ActorSeat.HasValue)
+        {
+            error = "AI command requires actor seat";
+            return false;
+        }
+
+        var room = LobbyManager.Instance.CurrentRoom;
+        if (room == null)
+        {
+            error = "No active room";
+            return false;
+        }
+
+        if (!room.SeatAssignments.TryGetValue(command.ActorSeat.Value, out var peerId) || !peerId.HasValue)
+        {
+            error = "AI seat is not occupied";
+            return false;
+        }
+
+        if (!room.Participants.TryGetValue(peerId.Value, out var participant) || !participant.IsBot)
+        {
+            error = "Seat is not controlled by AI";
+            return false;
+        }
+
+        return ApplyServerCommand(command, out error);
+    }
+
     public void ServerPauseForReconnect(int peerId, double timeoutSeconds)
     {
         if (_state == null || _state.Phase == OmiPhase.MatchEnd)
@@ -179,6 +242,7 @@ public partial class MatchCoordinator : Node
         _state.ReconnectPeerId = peerId;
         _state.ReconnectDeadlineUnixSeconds = Time.GetUnixTimeFromSystem() + timeoutSeconds;
         _state.Phase = OmiPhase.PausedReconnect;
+        StateVersion += 1;
 
         NetworkRpc.Instance.BroadcastPausedForReconnect(peerId, _state.ReconnectDeadlineUnixSeconds);
         LobbyManager.Instance.SetMatchLifecycle(RoomMatchLifecycle.PausedReconnect);
@@ -186,6 +250,7 @@ public partial class MatchCoordinator : Node
         LobbyManager.Instance.BroadcastMatchSnapshotToAll();
 
         EmitSignal(SignalName.MatchInfo, "Match paused for player reconnect");
+        EmitSignal(SignalName.MatchStateAdvanced);
     }
 
     public void ServerHandlePlayerReconnected(int peerId)
@@ -204,12 +269,14 @@ public partial class MatchCoordinator : Node
         _state.ReconnectPeerId = null;
         _state.ReconnectDeadlineUnixSeconds = 0;
         _state.Phase = _phaseBeforeReconnectPause;
+        StateVersion += 1;
 
         LobbyManager.Instance.SetMatchLifecycle(RoomMatchLifecycle.InMatch);
         LobbyManager.Instance.BroadcastRoomState();
         LobbyManager.Instance.BroadcastMatchSnapshotToAll();
 
         EmitSignal(SignalName.MatchInfo, "Player reconnected, match resumed");
+        EmitSignal(SignalName.MatchStateAdvanced);
     }
 
     public string BuildSnapshotForPeer(int peerId, ParticipantRole role)
@@ -251,6 +318,7 @@ public partial class MatchCoordinator : Node
             error = result.Error;
             return false;
         }
+        StateVersion += 1;
 
         PushEventNotifications(result);
 
@@ -259,6 +327,7 @@ public partial class MatchCoordinator : Node
             var startNext = _rulesEngine.ApplyCommand(_state, MatchCommand.StartNextRound((int)GD.Randi()));
             if (startNext.Success)
             {
+                StateVersion += 1;
                 PushEventNotifications(startNext);
             }
         }

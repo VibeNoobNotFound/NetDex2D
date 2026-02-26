@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using NetDex.AI;
 using NetDex.Core.Enums;
 
 namespace NetDex.Lobby;
@@ -14,6 +15,8 @@ public sealed class RoomState
     public string RoomInstanceId { get; set; } = Guid.NewGuid().ToString("N");
     public GameType GameType { get; set; } = GameType.Omi;
     public RoomMatchLifecycle MatchLifecycle { get; set; } = RoomMatchLifecycle.Lobby;
+    public bool AiAutoFillEnabled { get; set; } = true;
+    public AiDifficulty SelectedAiDifficulty { get; set; } = AiDifficulty.Strong;
 
     public Dictionary<int, ParticipantInfo> Participants { get; } = new();
     public Dictionary<SeatPosition, int?> SeatAssignments { get; } = new()
@@ -111,6 +114,8 @@ public sealed class RoomState
             ["roomInstanceId"] = RoomInstanceId,
             ["gameType"] = (int)GameType,
             ["matchLifecycle"] = (int)MatchLifecycle,
+            ["aiAutoFillEnabled"] = AiAutoFillEnabled,
+            ["selectedAiDifficulty"] = (int)SelectedAiDifficulty,
             ["participants"] = participants,
             ["seats"] = seats,
             ["playerCount"] = PlayerCount,
@@ -132,7 +137,11 @@ public sealed class RoomState
             GameType = dict.TryGetValue("gameType", out var gameType) ? (GameType)gameType.AsInt32() : GameType.Omi,
             MatchLifecycle = dict.TryGetValue("matchLifecycle", out var lifecycle)
                 ? (RoomMatchLifecycle)lifecycle.AsInt32()
-                : RoomMatchLifecycle.Lobby
+                : RoomMatchLifecycle.Lobby,
+            AiAutoFillEnabled = dict.TryGetValue("aiAutoFillEnabled", out var aiAutoFill) ? aiAutoFill.AsBool() : true,
+            SelectedAiDifficulty = dict.TryGetValue("selectedAiDifficulty", out var aiDifficulty) && aiDifficulty.AsInt32() >= 0
+                ? (AiDifficulty)aiDifficulty.AsInt32()
+                : AiDifficulty.Strong
         };
 
         if (dict.TryGetValue("participants", out var participantsVariant) && participantsVariant.VariantType == Variant.Type.Array)
@@ -161,8 +170,9 @@ public sealed class RoomState
                 }
 
                 var peerId = peerIdVariant.AsInt32();
-                state.SeatAssignments[seat] = peerId > 0 ? peerId : null;
-                if (peerId > 0 && state.Participants.TryGetValue(peerId, out var participant))
+                var isEmpty = peerId is -1 or 0;
+                state.SeatAssignments[seat] = isEmpty ? null : peerId;
+                if (!isEmpty && state.Participants.TryGetValue(peerId, out var participant))
                 {
                     participant.Seat = seat;
                     participant.Role = ParticipantRole.Player;

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using NetDex.AI;
 using NetDex.Core.Enums;
 using NetDex.Lobby;
 using NetDex.Managers;
@@ -18,8 +19,12 @@ public partial class LobbyScreen : Control
     private PanelContainer _seatsPanel = null!;
     private Button _startMatchButton = null!;
     private Button _returnToGameButton = null!;
+    private CheckButton _aiAutoFillCheck = null!;
+    private OptionButton _aiDifficultyOption = null!;
+    private Button _applyAiSettingsButton = null!;
 
     private readonly Dictionary<SeatPosition, OptionButton> _seatOptions = new();
+    private readonly Dictionary<int, AiDifficulty> _difficultyByOptionId = new();
     private RoomMatchLifecycle? _lastLifecycle;
 
     public override void _Ready()
@@ -44,6 +49,12 @@ public partial class LobbyScreen : Control
 
         _returnToGameButton = GetNode<Button>("MarginContainer/VBoxContainer/Actions/ReturnToGameButton");
         _returnToGameButton.Pressed += OnReturnToGamePressed;
+
+        _aiAutoFillCheck = GetNode<CheckButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions/AiAutoFillCheck");
+        _aiDifficultyOption = GetNode<OptionButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions/AiDifficultyRow/AiDifficultyOption");
+        _applyAiSettingsButton = GetNode<Button>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiActions/ApplyAiSettingsButton");
+        _applyAiSettingsButton.Pressed += OnApplyAiSettingsPressed;
+        PopulateAiDifficultyOptions();
 
         var leaveButton = GetNode<Button>("MarginContainer/VBoxContainer/Actions/LeaveRoomButton");
         leaveButton.Pressed += OnLeavePressed;
@@ -90,7 +101,7 @@ public partial class LobbyScreen : Control
         _lastLifecycle = room.MatchLifecycle;
 
         _roomLabel.Text = $"Room: {room.RoomName} | Host: {room.HostName} | State: {room.MatchLifecycle}";
-        _statusLabel.Text = $"Players: {room.PlayerCount} | Spectators: {room.SpectatorCount}";
+        _statusLabel.Text = $"Players: {room.PlayerCount} | Spectators: {room.SpectatorCount} | AI: {(room.AiAutoFillEnabled ? "Auto" : "Manual")} ({room.SelectedAiDifficulty})";
 
         _playersList.Clear();
         _spectatorsList.Clear();
@@ -99,7 +110,10 @@ public partial class LobbyScreen : Control
         {
             var tag = participant.IsConnected ? "online" : "offline";
             var seatText = participant.Seat?.ToString() ?? "No seat";
-            var text = $"{participant.Name} ({tag}) - {seatText}";
+            var botTag = participant.IsBot
+                ? $"[AI {participant.BotDifficulty ?? room.SelectedAiDifficulty}] "
+                : string.Empty;
+            var text = $"{botTag}{participant.Name} ({tag}) - {seatText}";
             if (participant.Role == ParticipantRole.Player)
             {
                 _playersList.AddItem(text);
@@ -116,6 +130,9 @@ public partial class LobbyScreen : Control
         _startMatchButton.Visible = isHost;
         _startMatchButton.Disabled = !isHost;
         _seatsPanel.Visible = isHost;
+        _aiAutoFillCheck.Disabled = !isHost;
+        _aiDifficultyOption.Disabled = !isHost;
+        _applyAiSettingsButton.Disabled = !isHost;
 
         _returnToGameButton.Visible = room.MatchLifecycle != RoomMatchLifecycle.Lobby;
         _returnToGameButton.Disabled = room.MatchLifecycle == RoomMatchLifecycle.Lobby;
@@ -124,6 +141,9 @@ public partial class LobbyScreen : Control
         {
             option.Disabled = !isHost;
         }
+
+        _aiAutoFillCheck.ButtonPressed = room.AiAutoFillEnabled;
+        SelectDifficulty(room.SelectedAiDifficulty);
 
         var shouldAutoOpenGame = room.MatchLifecycle != RoomMatchLifecycle.Lobby &&
                                  (previousLifecycle == null || previousLifecycle == RoomMatchLifecycle.Lobby);
@@ -143,9 +163,12 @@ public partial class LobbyScreen : Control
             option.Clear();
             option.AddItem("Empty", -1);
 
-            foreach (var participant in room.Participants.Values.Where(p => p.IsConnected))
+            foreach (var participant in room.Participants.Values.Where(p => p.IsConnected).OrderBy(p => p.IsBot ? 1 : 0).ThenBy(p => p.Name))
             {
-                option.AddItem(participant.Name, participant.PeerId);
+                var name = participant.IsBot
+                    ? $"[AI] {participant.Name}"
+                    : participant.Name;
+                option.AddItem(name, participant.PeerId);
             }
 
             var occupant = room.SeatAssignments[seat];
@@ -179,7 +202,7 @@ public partial class LobbyScreen : Control
         }
 
         var duplicatePeer = requestedSeats.Values
-            .Where(peerId => peerId > 0)
+            .Where(peerId => peerId != -1)
             .GroupBy(peerId => peerId)
             .FirstOrDefault(group => group.Count() > 1);
 
@@ -200,6 +223,49 @@ public partial class LobbyScreen : Control
         }
 
         SetStatus("Seat update sent.");
+    }
+
+    private void PopulateAiDifficultyOptions()
+    {
+        _aiDifficultyOption.Clear();
+        _difficultyByOptionId.Clear();
+        foreach (AiDifficulty difficulty in System.Enum.GetValues(typeof(AiDifficulty)))
+        {
+            var id = (int)difficulty;
+            _aiDifficultyOption.AddItem(difficulty.ToString(), id);
+            _difficultyByOptionId[id] = difficulty;
+        }
+    }
+
+    private void SelectDifficulty(AiDifficulty difficulty)
+    {
+        var targetId = (int)difficulty;
+        for (var i = 0; i < _aiDifficultyOption.ItemCount; i++)
+        {
+            if (_aiDifficultyOption.GetItemId(i) != targetId)
+            {
+                continue;
+            }
+
+            _aiDifficultyOption.Select(i);
+            return;
+        }
+    }
+
+    private void OnApplyAiSettingsPressed()
+    {
+        if (!LobbyManager.Instance.IsHostAuthority)
+        {
+            SetStatus("Only host can change AI settings.");
+            return;
+        }
+
+        var selectedId = _aiDifficultyOption.GetSelectedId();
+        var difficulty = _difficultyByOptionId.TryGetValue(selectedId, out var mapped)
+            ? mapped
+            : AiDifficulty.Strong;
+        NetworkRpc.Instance.SendSetAiOptionsRequest(_aiAutoFillCheck.ButtonPressed, difficulty);
+        SetStatus("AI settings updated.");
     }
 
     private void OnStartMatchPressed()

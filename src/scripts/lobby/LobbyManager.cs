@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Godot;
+using NetDex.AI;
 using NetDex.Core.Enums;
 using NetDex.Core.Serialization;
 using NetDex.Lobby.Stores;
@@ -10,6 +11,8 @@ namespace NetDex.Lobby;
 
 public partial class LobbyManager : Node
 {
+    private const int BotPeerIdStart = -1000;
+
     public static LobbyManager Instance { get; private set; } = null!;
 
     [Signal]
@@ -103,7 +106,9 @@ public partial class LobbyManager : Node
             IsConnected = true,
             IsHost = true,
             ReconnectToken = reconnectToken,
-            Seat = SeatPosition.Bottom
+            Seat = SeatPosition.Bottom,
+            Kind = ParticipantKind.Human,
+            BotDifficulty = null
         };
 
         room.Participants[hostPeerId] = hostParticipant;
@@ -179,6 +184,8 @@ public partial class LobbyManager : Node
             existing.Name = sanitizedName;
             existing.IsConnected = true;
             existing.Role = requestedRole;
+            existing.Kind = ParticipantKind.Human;
+            existing.BotDifficulty = null;
 
             var existingSnapshot = BuildRoomSnapshotJson();
             NetworkRpc.Instance.SendRoomSnapshot(peerId, existingSnapshot);
@@ -194,7 +201,9 @@ public partial class LobbyManager : Node
             ReconnectToken = reconnectToken,
             IsConnected = true,
             IsHost = false,
-            Seat = null
+            Seat = null,
+            Kind = ParticipantKind.Human,
+            BotDifficulty = null
         };
 
         room.Participants[peerId] = participant;
@@ -211,6 +220,8 @@ public partial class LobbyManager : Node
                 participant.Role = ParticipantRole.Spectator;
             }
         }
+
+        RemoveUnseatedLobbyBots();
 
         var snapshot = BuildRoomSnapshotJson();
         NetworkRpc.Instance.SendRoomSnapshot(peerId, snapshot);
@@ -284,9 +295,10 @@ public partial class LobbyManager : Node
             return false;
         }
 
-        if (targetPeerId <= 0)
+        if (targetPeerId == -1)
         {
             CurrentRoom.SetSeat(targetSeat, null);
+            RemoveUnseatedLobbyBots();
             BroadcastRoomState();
             return true;
         }
@@ -299,8 +311,66 @@ public partial class LobbyManager : Node
 
         participant.Role = ParticipantRole.Player;
         CurrentRoom.SetSeat(targetSeat, targetPeerId);
+        RemoveUnseatedLobbyBots();
 
         BroadcastRoomState();
+        return true;
+    }
+
+    public bool ServerSetAiOptions(int requesterPeerId, bool autoFill, AiDifficulty difficulty, out string error)
+    {
+        error = string.Empty;
+
+        if (!IsHostAuthority || CurrentRoom == null)
+        {
+            error = "Only host can change AI settings";
+            return false;
+        }
+
+        if (requesterPeerId != CurrentRoom.HostPeerId)
+        {
+            error = "Only host can change AI settings";
+            return false;
+        }
+
+        if (CurrentRoom.IsMatchRunning)
+        {
+            error = "Cannot change AI settings while match is running";
+            return false;
+        }
+
+        CurrentRoom.AiAutoFillEnabled = autoFill;
+        CurrentRoom.SelectedAiDifficulty = difficulty;
+
+        foreach (var participant in CurrentRoom.Participants.Values.Where(p => p.IsBot))
+        {
+            participant.BotDifficulty = difficulty;
+        }
+
+        BroadcastRoomState();
+        return true;
+    }
+
+    public bool ServerPreparePlayersForMatch(out string error)
+    {
+        error = string.Empty;
+        if (!IsHostAuthority || CurrentRoom == null)
+        {
+            error = "Not hosting room";
+            return false;
+        }
+
+        if (CurrentRoom.IsMatchRunning)
+        {
+            error = "Match already running";
+            return false;
+        }
+
+        if (CurrentRoom.AiAutoFillEnabled)
+        {
+            ServerAutoFillEmptySeatsWithBots();
+        }
+
         return true;
     }
 
@@ -322,9 +392,15 @@ public partial class LobbyManager : Node
                 return false;
             }
 
-            if (!CurrentRoom.Participants.TryGetValue(peerId.Value, out var participant) || !participant.IsConnected)
+            if (!CurrentRoom.Participants.TryGetValue(peerId.Value, out var participant))
             {
-                error = "All seated players must be connected";
+                error = "All seated players must be valid";
+                return false;
+            }
+
+            if (!participant.IsBot && !participant.IsConnected)
+            {
+                error = "All seated human players must be connected";
                 return false;
             }
         }
@@ -418,7 +494,7 @@ public partial class LobbyManager : Node
         foreach (var peerId in peerIds)
         {
             var participant = CurrentRoom.Participants[peerId];
-            if (!participant.IsConnected)
+            if (participant.IsBot || peerId <= 0 || !participant.IsConnected)
             {
                 continue;
             }
@@ -450,6 +526,17 @@ public partial class LobbyManager : Node
             return;
         }
 
+        if (participant.IsBot)
+        {
+            if (participant.Seat.HasValue)
+            {
+                CurrentRoom.SetSeat(participant.Seat.Value, null);
+            }
+
+            CurrentRoom.Participants.Remove(peerId);
+            return;
+        }
+
         if (participant.Seat.HasValue && CurrentRoom.MatchLifecycle == RoomMatchLifecycle.Lobby)
         {
             CurrentRoom.SetSeat(participant.Seat.Value, null);
@@ -467,6 +554,79 @@ public partial class LobbyManager : Node
         }
 
         participant.IsConnected = false;
+    }
+
+    private void ServerAutoFillEmptySeatsWithBots()
+    {
+        if (CurrentRoom == null)
+        {
+            return;
+        }
+
+        foreach (SeatPosition seat in Enum.GetValues(typeof(SeatPosition)))
+        {
+            if (CurrentRoom.IsSeatTaken(seat))
+            {
+                continue;
+            }
+
+            var botPeerId = AllocateNextBotPeerId();
+            var bot = CreateBotParticipantForSeat(botPeerId, seat, CurrentRoom.SelectedAiDifficulty);
+            CurrentRoom.Participants[botPeerId] = bot;
+            CurrentRoom.SetSeat(seat, botPeerId);
+        }
+
+        RemoveUnseatedLobbyBots();
+    }
+
+    private int AllocateNextBotPeerId()
+    {
+        if (CurrentRoom == null)
+        {
+            return BotPeerIdStart;
+        }
+
+        var cursor = BotPeerIdStart;
+        while (CurrentRoom.Participants.ContainsKey(cursor))
+        {
+            cursor -= 1;
+        }
+
+        return cursor;
+    }
+
+    private ParticipantInfo CreateBotParticipantForSeat(int peerId, SeatPosition seat, AiDifficulty difficulty)
+    {
+        return new ParticipantInfo
+        {
+            PeerId = peerId,
+            Name = $"Bot-{seat}",
+            Role = ParticipantRole.Player,
+            IsConnected = true,
+            IsHost = false,
+            ReconnectToken = string.Empty,
+            Seat = seat,
+            Kind = ParticipantKind.Bot,
+            BotDifficulty = difficulty
+        };
+    }
+
+    private void RemoveUnseatedLobbyBots()
+    {
+        if (CurrentRoom == null || CurrentRoom.MatchLifecycle != RoomMatchLifecycle.Lobby)
+        {
+            return;
+        }
+
+        var staleBotIds = CurrentRoom.Participants.Values
+            .Where(participant => participant.IsBot && !participant.Seat.HasValue)
+            .Select(participant => participant.PeerId)
+            .ToList();
+
+        foreach (var botPeerId in staleBotIds)
+        {
+            CurrentRoom.Participants.Remove(botPeerId);
+        }
     }
 
     private static string SanitizePlayerName(string name)

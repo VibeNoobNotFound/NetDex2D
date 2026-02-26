@@ -94,6 +94,26 @@ theme_override_constants/separation = 8
 layout_mode = 2
 text = "Host Seat Assignment"
 
+[node name="AiOptions" type="VBoxContainer" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="AiAutoFillCheck" type="CheckButton" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions"]
+layout_mode = 2
+button_pressed = true
+text = "Auto-fill empty seats with AI"
+
+[node name="AiDifficultyRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AiDifficultyLabel" type="Label" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions/AiDifficultyRow"]
+layout_mode = 2
+text = "AI Difficulty"
+
+[node name="AiDifficultyOption" type="OptionButton" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions/AiDifficultyRow"]
+layout_mode = 2
+
 [node name="SeatsGrid" type="GridContainer" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox"]
 layout_mode = 2
 columns = 2
@@ -133,6 +153,14 @@ alignment = 2
 [node name="ApplySeatsButton" type="Button" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsActions"]
 layout_mode = 2
 text = "Apply Seats"
+
+[node name="AiActions" type="HBoxContainer" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox"]
+layout_mode = 2
+alignment = 2
+
+[node name="ApplyAiSettingsButton" type="Button" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiActions"]
+layout_mode = 2
+text = "Apply AI Settings"
 
 [node name="Actions" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2

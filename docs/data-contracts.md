@@ -13,6 +13,17 @@ This file summarizes the important backend data contracts.
 - `Player`
 - `Spectator`
 
+### `ParticipantKind`
+
+- `Human`
+- `Bot`
+
+### `AiDifficulty`
+
+- `Easy`
+- `Normal`
+- `Strong`
+
 ### `SeatPosition`
 
 - `Bottom`
@@ -79,11 +90,18 @@ Important keys:
 - `roomInstanceId`
 - `gameType`
 - `matchLifecycle`
+- `aiAutoFillEnabled`
+- `selectedAiDifficulty`
 - `participants`
 - `seats`
 - `playerCount`
 - `spectatorCount`
 - `connectedPlayerCount`
+
+Participant entries now also include:
+
+- `kind`
+- `botDifficulty`
 
 ## Client -> server RPCs
 
@@ -92,6 +110,7 @@ Defined in `src/scripts/network/NetworkRpc.cs`:
 - `RequestJoinRoom(playerName, requestedRole, reconnectToken)`
 - `RequestSeatChange(targetSeat, targetPeerId)`
 - `RequestStartMatch()`
+- `RequestSetAiOptions(autoFill, difficulty)`
 - `RequestCutDeck(cutIndex)`
 - `RequestShuffleAgain(seed)`
 - `RequestFinishShuffle()`

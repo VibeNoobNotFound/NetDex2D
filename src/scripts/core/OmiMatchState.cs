@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using NetDex.Core.Enums;
 
 namespace NetDex.Core.Models;
@@ -63,5 +64,46 @@ public sealed class OmiMatchState
         CompletedTricksCount = 0;
         RoundWinnerTeam = null;
         TrumpSuit = null;
+    }
+
+    public OmiMatchState DeepClone()
+    {
+        var clone = new OmiMatchState
+        {
+            GameType = GameType,
+            Phase = Phase,
+            HostSeat = HostSeat,
+            RoundNumber = RoundNumber,
+            CompletedTricksCount = CompletedTricksCount,
+            TrumpSuit = TrumpSuit,
+            ShufflerSeat = ShufflerSeat,
+            CutterSeat = CutterSeat,
+            TrumpSelectorSeat = TrumpSelectorSeat,
+            CurrentTurnSeat = CurrentTurnSeat,
+            CurrentStake = CurrentStake,
+            TeamCredits = (int[])TeamCredits.Clone(),
+            TeamTricks = (int[])TeamTricks.Clone(),
+            Deck = Deck.ToList(),
+            DeckCursor = DeckCursor,
+            RoundWinnerTeam = RoundWinnerTeam,
+            MatchWinnerTeam = MatchWinnerTeam,
+            IsPausedForReconnect = IsPausedForReconnect,
+            ReconnectPeerId = ReconnectPeerId,
+            ReconnectDeadlineUnixSeconds = ReconnectDeadlineUnixSeconds
+        };
+
+        foreach (SeatPosition seat in Enum.GetValues(typeof(SeatPosition)))
+        {
+            clone.Hands[seat].Clear();
+            clone.Hands[seat].AddRange(Hands[seat]);
+        }
+
+        clone.CurrentTrickCards.AddRange(CurrentTrickCards);
+        foreach (var trick in CompletedTricks)
+        {
+            clone.CompletedTricks.Add(trick.ToList());
+        }
+
+        return clone;
     }
 }

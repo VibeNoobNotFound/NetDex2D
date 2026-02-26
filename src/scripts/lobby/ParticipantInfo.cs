@@ -1,3 +1,4 @@
+using NetDex.AI;
 using NetDex.Core.Enums;
 
 namespace NetDex.Lobby;
@@ -11,6 +12,10 @@ public sealed class ParticipantInfo
     public bool IsConnected { get; set; } = true;
     public bool IsHost { get; set; }
     public SeatPosition? Seat { get; set; }
+    public ParticipantKind Kind { get; set; } = ParticipantKind.Human;
+    public AiDifficulty? BotDifficulty { get; set; }
+
+    public bool IsBot => Kind == ParticipantKind.Bot;
 
     public Godot.Collections.Dictionary ToDictionary(bool includeReconnectToken)
     {
@@ -21,7 +26,9 @@ public sealed class ParticipantInfo
             ["role"] = (int)Role,
             ["isConnected"] = IsConnected,
             ["isHost"] = IsHost,
-            ["seat"] = Seat?.ToString() ?? string.Empty
+            ["seat"] = Seat?.ToString() ?? string.Empty,
+            ["kind"] = (int)Kind,
+            ["botDifficulty"] = BotDifficulty.HasValue ? (int)BotDifficulty.Value : -1
         };
 
         if (includeReconnectToken)
@@ -42,7 +49,11 @@ public sealed class ParticipantInfo
             IsConnected = dict.TryGetValue("isConnected", out var connected) && connected.AsBool(),
             IsHost = dict.TryGetValue("isHost", out var host) && host.AsBool(),
             Seat = dict.TryGetValue("seat", out var seatValue) ? NetDex.Core.Enums.SeatPositionExtensions.Parse(seatValue.AsString()) : null,
-            ReconnectToken = dict.TryGetValue("reconnectToken", out var token) ? token.AsString() : string.Empty
+            ReconnectToken = dict.TryGetValue("reconnectToken", out var token) ? token.AsString() : string.Empty,
+            Kind = dict.TryGetValue("kind", out var kind) ? (ParticipantKind)kind.AsInt32() : ParticipantKind.Human,
+            BotDifficulty = dict.TryGetValue("botDifficulty", out var difficulty) && difficulty.AsInt32() >= 0
+                ? (AiDifficulty)difficulty.AsInt32()
+                : null
         };
     }
 }

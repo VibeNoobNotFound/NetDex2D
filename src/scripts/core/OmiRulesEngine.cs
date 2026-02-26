@@ -64,6 +64,74 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         return MatchSnapshotSerializer.Serialize(visibleState);
     }
 
+    public IReadOnlyList<MatchCommand> EnumerateLegalCommands(OmiMatchState state, SeatPosition actorSeat, int actorPeerId)
+    {
+        var commands = new List<MatchCommand>();
+
+        switch (state.Phase)
+        {
+            case OmiPhase.Shuffle:
+                if (actorSeat != state.ShufflerSeat)
+                {
+                    return commands;
+                }
+
+                commands.Add(MatchCommand.FinishShuffle(actorSeat, actorPeerId));
+                for (var i = 0; i < 3; i++)
+                {
+                    commands.Add(MatchCommand.ShuffleAgain(actorSeat, actorPeerId, BuildDeterministicActionSeed(state, actorSeat, i)));
+                }
+
+                return commands;
+            case OmiPhase.Cut:
+                if (actorSeat != state.CutterSeat)
+                {
+                    return commands;
+                }
+
+                for (var cutIndex = 1; cutIndex < Math.Max(2, state.Deck.Count); cutIndex++)
+                {
+                    commands.Add(MatchCommand.CutDeck(actorSeat, actorPeerId, cutIndex));
+                }
+
+                return commands;
+            case OmiPhase.TrumpSelect:
+                if (actorSeat != state.TrumpSelectorSeat)
+                {
+                    return commands;
+                }
+
+                foreach (CardSuit suit in Enum.GetValues(typeof(CardSuit)))
+                {
+                    commands.Add(MatchCommand.SelectTrump(actorSeat, actorPeerId, suit));
+                }
+
+                return commands;
+            case OmiPhase.TrickPlay:
+                if (actorSeat != state.CurrentTurnSeat || !state.Hands.TryGetValue(actorSeat, out var hand))
+                {
+                    return commands;
+                }
+
+                foreach (var card in hand)
+                {
+                    if (IsCardPlayableByRule(state, hand, card))
+                    {
+                        commands.Add(MatchCommand.PlayCard(actorSeat, actorPeerId, card.Id));
+                    }
+                }
+
+                return commands;
+            default:
+                return commands;
+        }
+    }
+
+    public OmiMatchState CloneState(OmiMatchState state)
+    {
+        return state.DeepClone();
+    }
+
     private static MatchCommandResult StartRound(OmiMatchState state, int seed)
     {
         if (state.Phase != OmiPhase.LobbySeating && state.Phase != OmiPhase.RoundScore)
@@ -427,6 +495,33 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         }
 
         state.Phase = OmiPhase.RoundScore;
+    }
+
+    private static bool IsCardPlayableByRule(OmiMatchState state, IReadOnlyList<CardModel> hand, CardModel candidate)
+    {
+        if (state.CurrentTrickCards.Count == 0)
+        {
+            return true;
+        }
+
+        var leadSuit = state.CurrentTrickCards[0].Card.Suit;
+        var hasLeadSuit = hand.Any(card => card.Suit == leadSuit);
+        return !hasLeadSuit || candidate.Suit == leadSuit;
+    }
+
+    private static int BuildDeterministicActionSeed(OmiMatchState state, SeatPosition seat, int actionIndex)
+    {
+        unchecked
+        {
+            var seed = 17;
+            seed = seed * 31 + state.RoundNumber;
+            seed = seed * 31 + state.CompletedTricksCount;
+            seed = seed * 31 + (int)seat;
+            seed = seed * 31 + actionIndex;
+            seed = seed * 31 + state.TeamCredits[0];
+            seed = seed * 31 + state.TeamCredits[1];
+            return seed;
+        }
     }
 
     private static SeatPosition DetermineTrickWinner(IReadOnlyList<PlayedCard> trickCards, CardSuit? trumpSuit)

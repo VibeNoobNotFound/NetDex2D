@@ -1,4 +1,5 @@
 using Godot;
+using NetDex.AI;
 using NetDex.Core.Enums;
 using NetDex.Lobby;
 
@@ -58,6 +59,26 @@ public partial class NetworkRpc : Node
         }
 
         RpcId(1, nameof(RequestStartMatch));
+    }
+
+    public void SendSetAiOptionsRequest(bool autoFill, AiDifficulty difficulty)
+    {
+        if (Multiplayer.IsServer())
+        {
+            var ok = LobbyManager.Instance.ServerSetAiOptions(
+                Multiplayer.GetUniqueId(),
+                autoFill,
+                difficulty,
+                out var error);
+            if (!ok)
+            {
+                EmitSignal(SignalName.ServerMessage, error);
+            }
+
+            return;
+        }
+
+        RpcId(1, nameof(RequestSetAiOptions), autoFill, (int)difficulty);
     }
 
     public void SendCutDeckRequest(int cutIndex)
@@ -168,6 +189,28 @@ public partial class NetworkRpc : Node
 
         var sender = (int)Multiplayer.GetRemoteSenderId();
         var ok = MatchCoordinator.Instance.ServerStartMatch(sender, out var error);
+        if (!ok)
+        {
+            RpcId(sender, nameof(PushServerMessage), error);
+        }
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    public void RequestSetAiOptions(bool autoFill, int difficulty)
+    {
+        if (!Multiplayer.IsServer())
+        {
+            return;
+        }
+
+        var sender = (int)Multiplayer.GetRemoteSenderId();
+        if (!System.Enum.IsDefined(typeof(AiDifficulty), difficulty))
+        {
+            RpcId(sender, nameof(PushServerMessage), "Invalid AI difficulty");
+            return;
+        }
+
+        var ok = LobbyManager.Instance.ServerSetAiOptions(sender, autoFill, (AiDifficulty)difficulty, out var error);
         if (!ok)
         {
             RpcId(sender, nameof(PushServerMessage), error);

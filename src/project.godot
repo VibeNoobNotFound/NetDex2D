@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 GameManager="*res://scripts/managers/GameManager.cs"
 LobbyManager="*res://scripts/lobby/LobbyManager.cs"
 MatchCoordinator="*res://scripts/game/MatchCoordinator.cs"
+AiCoordinator="*res://scripts/ai/AiCoordinator.cs"
 NetworkRpc="*res://scripts/network/NetworkRpc.cs"
 NetworkManager="*res://scripts/network/NetworkManager.cs"
 

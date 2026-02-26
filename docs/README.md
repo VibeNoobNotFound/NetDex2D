@@ -15,6 +15,7 @@ If you are new, read in this order:
 7. `data-contracts.md`
 8. `troubleshooting.md`
 9. `android-networking.md`
+10. `ai-bot-system.md`
 
 ## Quick project map
 

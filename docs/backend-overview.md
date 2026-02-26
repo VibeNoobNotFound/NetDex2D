@@ -76,6 +76,21 @@ Responsibilities:
 - Update deterministic match state
 - Produce rule events
 
+### 6) `AiCoordinator` + AI policy (host bot decisions)
+
+Files:
+
+- `src/scripts/ai/AiCoordinator.cs`
+- `src/scripts/ai/OmiBotPolicy.cs`
+
+Responsibilities:
+
+- Detect when current turn belongs to a bot participant
+- Build strict-fair bot perception (no hidden opponent hands)
+- Compute command in background thread
+- Submit command back through authoritative server flow (`MatchCoordinator`)
+- Keep decisions safe with state-version checks
+
 ## Autoload services (always alive)
 
 These are configured in `src/project.godot`:
@@ -83,6 +98,7 @@ These are configured in `src/project.godot`:
 - `GameManager`
 - `LobbyManager`
 - `MatchCoordinator`
+- `AiCoordinator`
 - `NetworkRpc`
 - `NetworkManager`
 
