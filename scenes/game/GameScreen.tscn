@@ -25,9 +25,9 @@ layout_mode = 1
 anchors_preset = 10
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -500.0
+offset_left = -520.0
 offset_top = 14.0
-offset_right = 500.0
+offset_right = 520.0
 offset_bottom = 46.0
 grow_horizontal = 2
 horizontal_alignment = 1
@@ -55,6 +55,112 @@ offset_bottom = 200.0
 grow_horizontal = 2
 grow_vertical = 2
 
+[node name="LeftTrickPile" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -240.0
+offset_top = 66.0
+offset_right = -120.0
+offset_bottom = 190.0
+grow_horizontal = 2
+
+[node name="RightTrickPile" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = 120.0
+offset_top = 66.0
+offset_right = 240.0
+offset_bottom = 190.0
+grow_horizontal = 2
+
+[node name="LeftPileLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -250.0
+offset_top = 48.0
+offset_right = -110.0
+offset_bottom = 72.0
+grow_horizontal = 2
+horizontal_alignment = 1
+text = "Your Tricks"
+
+[node name="RightPileLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = 110.0
+offset_top = 48.0
+offset_right = 250.0
+offset_bottom = 72.0
+grow_horizontal = 2
+horizontal_alignment = 1
+text = "Enemy Tricks"
+
+[node name="BottomPlayerName" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -180.0
+offset_top = -186.0
+offset_right = 180.0
+offset_bottom = -162.0
+grow_horizontal = 2
+grow_vertical = 0
+horizontal_alignment = 1
+text = "Bottom"
+
+[node name="TopPlayerName" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -180.0
+offset_top = 42.0
+offset_right = 180.0
+offset_bottom = 66.0
+grow_horizontal = 2
+horizontal_alignment = 1
+text = "Top"
+
+[node name="LeftPlayerName" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 12.0
+offset_top = -232.0
+offset_right = 140.0
+offset_bottom = -208.0
+grow_vertical = 2
+horizontal_alignment = 1
+text = "Left"
+
+[node name="RightPlayerName" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -140.0
+offset_top = -232.0
+offset_right = -12.0
+offset_bottom = -208.0
+grow_horizontal = 0
+grow_vertical = 2
+horizontal_alignment = 1
+text = "Right"
+
 [node name="BottomHand" type="HBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = 7
@@ -77,9 +183,9 @@ anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
 offset_left = -280.0
-offset_top = 40.0
+offset_top = 72.0
 offset_right = 280.0
-offset_bottom = 160.0
+offset_bottom = 184.0
 grow_horizontal = 2
 theme_override_constants/separation = -34
 alignment = 1
@@ -90,9 +196,9 @@ anchors_preset = 4
 anchor_top = 0.5
 anchor_bottom = 0.5
 offset_left = 24.0
-offset_top = -210.0
+offset_top = -188.0
 offset_right = 108.0
-offset_bottom = 210.0
+offset_bottom = 188.0
 grow_vertical = 2
 theme_override_constants/separation = -44
 alignment = 1
@@ -105,9 +211,9 @@ anchor_top = 0.5
 anchor_right = 1.0
 anchor_bottom = 0.5
 offset_left = -108.0
-offset_top = -210.0
+offset_top = -188.0
 offset_right = -24.0
-offset_bottom = 210.0
+offset_bottom = 188.0
 grow_horizontal = 0
 grow_vertical = 2
 theme_override_constants/separation = -44
@@ -118,10 +224,10 @@ layout_mode = 1
 anchors_preset = 10
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -170.0
-offset_top = 64.0
-offset_right = 170.0
-offset_bottom = 190.0
+offset_left = -190.0
+offset_top = 212.0
+offset_right = 190.0
+offset_bottom = 360.0
 grow_horizontal = 2
 
 [node name="VBoxContainer" type="VBoxContainer" parent="ActionPanel"]
@@ -139,3 +245,8 @@ layout_mode = 2
 [node name="ActionButton" type="Button" parent="ActionPanel/VBoxContainer"]
 layout_mode = 2
 text = "Confirm"
+
+[node name="SecondaryActionButton" type="Button" parent="ActionPanel/VBoxContainer"]
+layout_mode = 2
+text = "Secondary"
+visible = false

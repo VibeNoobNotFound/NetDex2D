@@ -17,6 +17,7 @@ public partial class LobbyScreen : Control
 
     private PanelContainer _seatsPanel = null!;
     private Button _startMatchButton = null!;
+    private Button _returnToGameButton = null!;
 
     private readonly Dictionary<SeatPosition, OptionButton> _seatOptions = new();
     private RoomMatchLifecycle? _lastLifecycle;
@@ -40,6 +41,9 @@ public partial class LobbyScreen : Control
 
         _startMatchButton = GetNode<Button>("MarginContainer/VBoxContainer/Actions/StartMatchButton");
         _startMatchButton.Pressed += OnStartMatchPressed;
+
+        _returnToGameButton = GetNode<Button>("MarginContainer/VBoxContainer/Actions/ReturnToGameButton");
+        _returnToGameButton.Pressed += OnReturnToGamePressed;
 
         var leaveButton = GetNode<Button>("MarginContainer/VBoxContainer/Actions/LeaveRoomButton");
         leaveButton.Pressed += OnLeavePressed;
@@ -113,6 +117,9 @@ public partial class LobbyScreen : Control
         _startMatchButton.Disabled = !isHost;
         _seatsPanel.Visible = isHost;
 
+        _returnToGameButton.Visible = room.MatchLifecycle != RoomMatchLifecycle.Lobby;
+        _returnToGameButton.Disabled = room.MatchLifecycle == RoomMatchLifecycle.Lobby;
+
         foreach (var option in _seatOptions.Values)
         {
             option.Disabled = !isHost;
@@ -185,6 +192,11 @@ public partial class LobbyScreen : Control
     {
         NetworkManager.Instance.DisconnectSession("Left room");
         GameManager.Instance?.LoadMainMenu();
+    }
+
+    private static void OnReturnToGamePressed()
+    {
+        GameManager.Instance?.LoadGameScene();
     }
 
     private void OnServerEventReceived(string eventType, string payloadJson)

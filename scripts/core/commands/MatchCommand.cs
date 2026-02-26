@@ -19,6 +19,21 @@ public sealed class MatchCommand
         Seed = seed
     };
 
+    public static MatchCommand ShuffleAgain(SeatPosition actorSeat, int actorPeerId, int seed) => new()
+    {
+        Type = MatchCommandType.ShuffleAgain,
+        ActorSeat = actorSeat,
+        ActorPeerId = actorPeerId,
+        Seed = seed
+    };
+
+    public static MatchCommand FinishShuffle(SeatPosition actorSeat, int actorPeerId) => new()
+    {
+        Type = MatchCommandType.FinishShuffle,
+        ActorSeat = actorSeat,
+        ActorPeerId = actorPeerId
+    };
+
     public static MatchCommand CutDeck(SeatPosition actorSeat, int actorPeerId, int cutIndex) => new()
     {
         Type = MatchCommandType.CutDeck,

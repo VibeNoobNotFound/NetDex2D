@@ -3,9 +3,11 @@ namespace NetDex.Core.Commands;
 public enum MatchCommandType
 {
     StartRound = 0,
-    CutDeck = 1,
-    SelectTrump = 2,
-    PlayCard = 3,
-    StartNextRound = 4,
-    ForfeitTeam = 5
+    ShuffleAgain = 1,
+    FinishShuffle = 2,
+    CutDeck = 3,
+    SelectTrump = 4,
+    PlayCard = 5,
+    StartNextRound = 6,
+    ForfeitTeam = 7
 }

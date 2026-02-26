@@ -127,6 +127,26 @@ public partial class MatchCoordinator : Node
         return ApplyServerCommand(MatchCommand.CutDeck(seat, peerId, cutIndex), out error);
     }
 
+    public bool ServerHandleShuffleAgain(int peerId, int seed, out string error)
+    {
+        if (!TryResolveSeat(peerId, out var seat, out error))
+        {
+            return false;
+        }
+
+        return ApplyServerCommand(MatchCommand.ShuffleAgain(seat, peerId, seed), out error);
+    }
+
+    public bool ServerHandleFinishShuffle(int peerId, out string error)
+    {
+        if (!TryResolveSeat(peerId, out var seat, out error))
+        {
+            return false;
+        }
+
+        return ApplyServerCommand(MatchCommand.FinishShuffle(seat, peerId), out error);
+    }
+
     public bool ServerHandleSelectTrump(int peerId, CardSuit suit, out string error)
     {
         if (!TryResolveSeat(peerId, out var seat, out error))

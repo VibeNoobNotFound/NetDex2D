@@ -29,6 +29,8 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         {
             MatchCommandType.StartRound => StartRound(state, command.Seed),
             MatchCommandType.StartNextRound => StartRound(state, command.Seed),
+            MatchCommandType.ShuffleAgain => ShuffleAgain(state, command),
+            MatchCommandType.FinishShuffle => FinishShuffle(state, command),
             MatchCommandType.CutDeck => CutDeck(state, command),
             MatchCommandType.SelectTrump => SelectTrump(state, command),
             MatchCommandType.PlayCard => PlayCard(state, command),
@@ -75,13 +77,11 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         state.ShufflerSeat = state.RoundNumber == 1 ? state.HostSeat : state.ShufflerSeat.Next();
         state.CutterSeat = state.ShufflerSeat.Previous();
         state.TrumpSelectorSeat = state.ShufflerSeat.Next();
-        state.CurrentTurnSeat = state.CutterSeat;
+        state.CurrentTurnSeat = state.ShufflerSeat;
 
         state.Phase = OmiPhase.Shuffle;
         state.Deck = DeckService.Shuffle(DeckService.BuildOmiDeck(), seed);
         state.DeckCursor = 0;
-
-        state.Phase = OmiPhase.Cut;
 
         return MatchCommandResult.Ok(new MatchEvent
         {
@@ -93,6 +93,58 @@ public sealed class OmiRulesEngine : IGameRulesEngine
                 ["cutterSeat"] = state.CutterSeat.ToString(),
                 ["trumpSelectorSeat"] = state.TrumpSelectorSeat.ToString(),
                 ["phase"] = (int)state.Phase
+            }
+        });
+    }
+
+    private static MatchCommandResult ShuffleAgain(OmiMatchState state, MatchCommand command)
+    {
+        if (state.Phase != OmiPhase.Shuffle)
+        {
+            return MatchCommandResult.Fail($"Cannot shuffle during {state.Phase}");
+        }
+
+        if (!command.ActorSeat.HasValue || command.ActorSeat.Value != state.ShufflerSeat)
+        {
+            return MatchCommandResult.Fail("Only the shuffler can reshuffle");
+        }
+
+        var shuffledDeck = DeckService.Shuffle(state.Deck.Count > 0 ? state.Deck : DeckService.BuildOmiDeck(), command.Seed);
+        state.Deck = shuffledDeck;
+        state.DeckCursor = 0;
+
+        return MatchCommandResult.Ok(new MatchEvent
+        {
+            Type = "deck_shuffled",
+            Payload = new Godot.Collections.Dictionary
+            {
+                ["phase"] = (int)state.Phase
+            }
+        });
+    }
+
+    private static MatchCommandResult FinishShuffle(OmiMatchState state, MatchCommand command)
+    {
+        if (state.Phase != OmiPhase.Shuffle)
+        {
+            return MatchCommandResult.Fail($"Cannot finish shuffle during {state.Phase}");
+        }
+
+        if (!command.ActorSeat.HasValue || command.ActorSeat.Value != state.ShufflerSeat)
+        {
+            return MatchCommandResult.Fail("Only the shuffler can finish shuffling");
+        }
+
+        state.Phase = OmiPhase.Cut;
+        state.CurrentTurnSeat = state.CutterSeat;
+
+        return MatchCommandResult.Ok(new MatchEvent
+        {
+            Type = "shuffle_finished",
+            Payload = new Godot.Collections.Dictionary
+            {
+                ["phase"] = (int)state.Phase,
+                ["cutterSeat"] = state.CutterSeat.ToString()
             }
         });
     }

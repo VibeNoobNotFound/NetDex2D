@@ -71,6 +71,28 @@ public partial class NetworkRpc : Node
         RpcId(1, nameof(RequestCutDeck), cutIndex);
     }
 
+    public void SendShuffleAgainRequest(int seed)
+    {
+        if (Multiplayer.IsServer())
+        {
+            MatchCoordinator.Instance.ServerHandleShuffleAgain(Multiplayer.GetUniqueId(), seed, out _);
+            return;
+        }
+
+        RpcId(1, nameof(RequestShuffleAgain), seed);
+    }
+
+    public void SendFinishShuffleRequest()
+    {
+        if (Multiplayer.IsServer())
+        {
+            MatchCoordinator.Instance.ServerHandleFinishShuffle(Multiplayer.GetUniqueId(), out _);
+            return;
+        }
+
+        RpcId(1, nameof(RequestFinishShuffle));
+    }
+
     public void SendSelectTrumpRequest(CardSuit suit)
     {
         if (Multiplayer.IsServer())
@@ -162,6 +184,38 @@ public partial class NetworkRpc : Node
 
         var sender = (int)Multiplayer.GetRemoteSenderId();
         var ok = MatchCoordinator.Instance.ServerHandleCutDeck(sender, cutIndex, out var error);
+        if (!ok)
+        {
+            RpcId(sender, nameof(PushServerMessage), error);
+        }
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    public void RequestShuffleAgain(int seed)
+    {
+        if (!Multiplayer.IsServer())
+        {
+            return;
+        }
+
+        var sender = (int)Multiplayer.GetRemoteSenderId();
+        var ok = MatchCoordinator.Instance.ServerHandleShuffleAgain(sender, seed, out var error);
+        if (!ok)
+        {
+            RpcId(sender, nameof(PushServerMessage), error);
+        }
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    public void RequestFinishShuffle()
+    {
+        if (!Multiplayer.IsServer())
+        {
+            return;
+        }
+
+        var sender = (int)Multiplayer.GetRemoteSenderId();
+        var ok = MatchCoordinator.Instance.ServerHandleFinishShuffle(sender, out var error);
         if (!ok)
         {
             RpcId(sender, nameof(PushServerMessage), error);
