@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://bviqjkvtm2tcv"]
+
+[ext_resource type="PackedScene" uid="uid://mainmenu" path="res://scenes/ui/MainMenu.tscn" id="1_main"]
+[ext_resource type="PackedScene" uid="uid://settingsmenu" path="res://scenes/ui/SettingsMenu.tscn" id="2_set"]
+[ext_resource type="PackedScene" uid="uid://gamescreen" path="res://scenes/game/GameScreen.tscn" id="3_game"]
+
+[node name="Main" type="Control" unique_id=665908007]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MainMenu" parent="." unique_id=358429399 instance=ExtResource("1_main")]
+layout_mode = 1
+
+[node name="VBoxContainer" parent="MainMenu" index="1"]
+offset_left = -195.0
+offset_top = -209.0
+offset_right = 172.0
+offset_bottom = 158.0
+metadata/_edit_group_ = true
+
+[node name="SettingsMenu" parent="." unique_id=1422027264 instance=ExtResource("2_set")]
+visible = false
+layout_mode = 1
+
+[node name="GameScreen" parent="." unique_id=922154207 instance=ExtResource("3_game")]
+visible = false
+layout_mode = 1
+
+[editable path="MainMenu"]
