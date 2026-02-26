@@ -17,6 +17,7 @@ public partial class NetworkManager : Node
     public const double ReconnectTimeoutSeconds = 90.0;
     public const int MaxSpectators = 32;
     public const int MaxPlayers = 4;
+    public const int DiscoveryPortRangeSize = 12;
 
     private const double DiscoveryExpirySeconds = 6.0;
     private const double DiscoveryUiThrottleSeconds = 0.25;
@@ -37,6 +38,7 @@ public partial class NetworkManager : Node
     private bool _discoveryDirty;
     private string _lastDiscoveryFingerprint = string.Empty;
     private double _lastDiscoveryUiPublishUnix;
+    private int _discoveryListenPort = -1;
 
     [Signal]
     public delegate void DiscoveryUpdatedEventHandler();
@@ -232,19 +234,40 @@ public partial class NetworkManager : Node
             return;
         }
 
-        _discoveryReceiver = new PacketPeerUdp();
-        _discoveryReceiver.SetBroadcastEnabled(true);
+        var receiver = new PacketPeerUdp();
+        receiver.SetBroadcastEnabled(true);
 
-        var bindResult = _discoveryReceiver.Bind(DiscoveryPort, "*");
-        if (bindResult != Error.Ok)
+        var bindResult = Error.Failed;
+        var listenPort = -1;
+        for (var offset = 0; offset < DiscoveryPortRangeSize; offset++)
         {
-            EmitSignal(SignalName.NetworkMessage, $"Discovery bind failed: {bindResult}");
-            _discoveryReceiver.Close();
-            _discoveryReceiver = null;
+            listenPort = DiscoveryPort + offset;
+            bindResult = receiver.Bind(listenPort, "*");
+            if (bindResult == Error.Ok)
+            {
+                break;
+            }
+            listenPort = -1;
+        }
+
+        if (listenPort < 0)
+        {
+            EmitSignal(
+                SignalName.NetworkMessage,
+                $"Discovery bind failed on ports {DiscoveryPort}-{DiscoveryPort + DiscoveryPortRangeSize - 1}: {bindResult}"
+            );
+            receiver.Close();
             return;
         }
 
+        _discoveryReceiver = receiver;
+        _discoveryListenPort = listenPort;
         _discoveryPollTimer?.Start();
+
+        if (_discoveryListenPort != DiscoveryPort)
+        {
+            EmitSignal(SignalName.NetworkMessage, $"Discovery using fallback port {_discoveryListenPort}");
+        }
     }
 
     public void StopDiscovery()
@@ -255,6 +278,7 @@ public partial class NetworkManager : Node
             _discoveryReceiver.Close();
             _discoveryReceiver = null;
         }
+        _discoveryListenPort = -1;
 
         _discoveryStore.Clear();
         _discoveryDirty = true;
@@ -369,8 +393,12 @@ public partial class NetworkManager : Node
         var advertisement = LobbyManager.Instance.BuildAdvertisement(localIp).ToDictionary();
         var payload = Json.Stringify(advertisement);
 
-        _discoverySender.SetDestAddress("255.255.255.255", DiscoveryPort);
-        _discoverySender.PutPacket(Encoding.UTF8.GetBytes(payload));
+        var packet = Encoding.UTF8.GetBytes(payload);
+        for (var offset = 0; offset < DiscoveryPortRangeSize; offset++)
+        {
+            _discoverySender.SetDestAddress("255.255.255.255", DiscoveryPort + offset);
+            _discoverySender.PutPacket(packet);
+        }
     }
 
     private static string GetPreferredLocalAddress()
