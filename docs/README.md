@@ -14,6 +14,7 @@ If you are new, read in this order:
 6. `match-runtime-flow.md`
 7. `data-contracts.md`
 8. `troubleshooting.md`
+9. `android-networking.md`
 
 ## Quick project map
 

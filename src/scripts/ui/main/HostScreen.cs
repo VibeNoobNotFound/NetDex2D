@@ -9,20 +9,27 @@ public partial class HostScreen : Control
     private LineEdit _playerNameInput = null!;
     private LineEdit _roomNameInput = null!;
     private Label _statusLabel = null!;
+    private Label? _hostIpLabel;
 
     public override void _Ready()
     {
         _playerNameInput = GetNode<LineEdit>("CenterContainer/MainPanel/VBoxContainer/PlayerNameInput");
         _roomNameInput = GetNode<LineEdit>("CenterContainer/MainPanel/VBoxContainer/RoomNameInput");
         _statusLabel = GetNode<Label>("CenterContainer/MainPanel/VBoxContainer/StatusLabel");
+        _hostIpLabel = GetNodeOrNull<Label>("CenterContainer/MainPanel/VBoxContainer/HostIpLabel");
 
         _playerNameInput.Text = NetworkManager.Instance.GetSavedPlayerName();
+        if (_hostIpLabel != null)
+        {
+            _hostIpLabel.Text = $"LAN IP: {NetworkManager.Instance.GetLocalLanAddress()}:{NetworkManager.GamePort}";
+        }
 
         GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/CreateHostButton").Pressed += OnCreateHostPressed;
         GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/BackButton").Pressed += OnBackPressed;
 
         NetworkManager.Instance.ConnectionStatusChanged += OnConnectionStatusChanged;
         NetworkManager.Instance.NetworkMessage += OnNetworkMessage;
+        NetworkManager.Instance.NetworkIssueRaised += OnNetworkIssueRaised;
     }
 
     public override void _ExitTree()
@@ -34,6 +41,7 @@ public partial class HostScreen : Control
 
         NetworkManager.Instance.ConnectionStatusChanged -= OnConnectionStatusChanged;
         NetworkManager.Instance.NetworkMessage -= OnNetworkMessage;
+        NetworkManager.Instance.NetworkIssueRaised -= OnNetworkIssueRaised;
     }
 
     private void OnCreateHostPressed()
@@ -61,6 +69,11 @@ public partial class HostScreen : Control
     }
 
     private void OnNetworkMessage(string message)
+    {
+        SetStatus(message);
+    }
+
+    private void OnNetworkIssueRaised(int issueCode, string message)
     {
         SetStatus(message);
     }

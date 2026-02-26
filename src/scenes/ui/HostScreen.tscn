@@ -51,6 +51,11 @@ layout_mode = 2
 placeholder_text = "Room Name"
 text = "My Omi Room"
 
+[node name="HostIpLabel" type="Label" parent="CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "LAN IP: -"
+autowrap_mode = 2
+
 [node name="CreateHostButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2

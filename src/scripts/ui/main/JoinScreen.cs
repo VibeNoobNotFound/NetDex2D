@@ -38,6 +38,7 @@ public partial class JoinScreen : Control
         NetworkManager.Instance.DiscoveryUpdated += RefreshRooms;
         NetworkManager.Instance.ConnectionStatusChanged += OnConnectionStatusChanged;
         NetworkManager.Instance.NetworkMessage += OnNetworkMessage;
+        NetworkManager.Instance.NetworkIssueRaised += OnNetworkIssueRaised;
 
         NetworkManager.Instance.StartDiscovery();
         RefreshRooms();
@@ -53,6 +54,7 @@ public partial class JoinScreen : Control
         NetworkManager.Instance.DiscoveryUpdated -= RefreshRooms;
         NetworkManager.Instance.ConnectionStatusChanged -= OnConnectionStatusChanged;
         NetworkManager.Instance.NetworkMessage -= OnNetworkMessage;
+        NetworkManager.Instance.NetworkIssueRaised -= OnNetworkIssueRaised;
     }
 
     private void OnRefreshPressed()
@@ -188,6 +190,24 @@ public partial class JoinScreen : Control
 
     private void OnNetworkMessage(string message)
     {
+        if (message.Contains("Auto discovery unavailable"))
+        {
+            SetStatus($"{message} If no rooms appear, use Direct Host IP below.");
+            return;
+        }
+
+        SetStatus(message);
+    }
+
+    private void OnNetworkIssueRaised(int issueCode, string message)
+    {
+        var code = (NetworkIssueCode)issueCode;
+        if (code == NetworkIssueCode.DiscoveryBindFailed || code == NetworkIssueCode.MissingInternetPermission)
+        {
+            SetStatus($"{message} If no rooms appear, use Direct Host IP below.");
+            return;
+        }
+
         SetStatus(message);
     }
 

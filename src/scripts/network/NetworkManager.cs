@@ -49,6 +49,9 @@ public partial class NetworkManager : Node
     [Signal]
     public delegate void NetworkMessageEventHandler(string message);
 
+    [Signal]
+    public delegate void NetworkIssueRaisedEventHandler(int issueCode, string message);
+
     public override void _Ready()
     {
         if (Instance != null && Instance != this)
@@ -108,6 +111,11 @@ public partial class NetworkManager : Node
         EmitSignal(SignalName.DiscoveryUpdated);
     }
 
+    public string GetLocalLanAddress()
+    {
+        return GetPreferredLocalAddress();
+    }
+
     public string GetSavedPlayerName()
     {
         var config = new ConfigFile();
@@ -164,7 +172,11 @@ public partial class NetworkManager : Node
         var result = peer.CreateServer(GamePort, MaxPlayers + MaxSpectators + 1);
         if (result != Error.Ok)
         {
-            EmitSignal(SignalName.ConnectionStatusChanged, "error", $"Failed to host: {result}");
+            var issueCode = MapIssueForSocketError(result, discoveryBind: false);
+            var message = BuildSessionCreateFailureMessage("Failed to host", result);
+            EmitSignal(SignalName.ConnectionStatusChanged, "error", message);
+            EmitNetworkIssue(issueCode, message);
+            StartDiscovery();
             return result;
         }
 
@@ -174,7 +186,8 @@ public partial class NetworkManager : Node
         LobbyManager.Instance.CreateHostedRoom(roomName, playerName, reconnectToken);
 
         StartAdvertising();
-        EmitSignal(SignalName.ConnectionStatusChanged, "hosting", $"Hosting room '{roomName}' on port {GamePort}");
+        var localIp = GetPreferredLocalAddress();
+        EmitSignal(SignalName.ConnectionStatusChanged, "hosting", $"Hosting room '{roomName}' on {localIp}:{GamePort}");
         return Error.Ok;
     }
 
@@ -190,7 +203,10 @@ public partial class NetworkManager : Node
         var result = peer.CreateClient(hostAddress, GamePort);
         if (result != Error.Ok)
         {
-            EmitSignal(SignalName.ConnectionStatusChanged, "error", $"Failed to connect: {result}");
+            var issueCode = MapIssueForSocketError(result, discoveryBind: false);
+            var message = BuildSessionCreateFailureMessage("Failed to connect", result);
+            EmitSignal(SignalName.ConnectionStatusChanged, "error", message);
+            EmitNetworkIssue(issueCode, message);
             return result;
         }
 
@@ -247,15 +263,15 @@ public partial class NetworkManager : Node
             {
                 break;
             }
+
             listenPort = -1;
         }
 
         if (listenPort < 0)
         {
-            EmitSignal(
-                SignalName.NetworkMessage,
-                $"Discovery bind failed on ports {DiscoveryPort}-{DiscoveryPort + DiscoveryPortRangeSize - 1}: {bindResult}"
-            );
+            var issueCode = MapIssueForSocketError(bindResult, discoveryBind: true);
+            var message = BuildDiscoveryBindFailureMessage(bindResult);
+            EmitNetworkIssue(issueCode, message);
             receiver.Close();
             return;
         }
@@ -278,8 +294,8 @@ public partial class NetworkManager : Node
             _discoveryReceiver.Close();
             _discoveryReceiver = null;
         }
-        _discoveryListenPort = -1;
 
+        _discoveryListenPort = -1;
         _discoveryStore.Clear();
         _discoveryDirty = true;
         PublishDiscoveryIfNeeded(force: true);
@@ -399,6 +415,58 @@ public partial class NetworkManager : Node
             _discoverySender.SetDestAddress("255.255.255.255", DiscoveryPort + offset);
             _discoverySender.PutPacket(packet);
         }
+    }
+
+    private void EmitNetworkIssue(NetworkIssueCode issueCode, string message)
+    {
+        EmitSignal(SignalName.NetworkIssueRaised, (int)issueCode, message);
+        EmitSignal(SignalName.NetworkMessage, message);
+    }
+
+    private static bool IsAndroidRuntime()
+    {
+        return OS.HasFeature("android");
+    }
+
+    private static NetworkIssueCode MapIssueForSocketError(Error error, bool discoveryBind)
+    {
+        if (IsAndroidRuntime() && error == Error.CantCreate)
+        {
+            return NetworkIssueCode.MissingInternetPermission;
+        }
+
+        return discoveryBind ? NetworkIssueCode.DiscoveryBindFailed : NetworkIssueCode.SocketCreateFailed;
+    }
+
+    private static string AndroidPermissionHint()
+    {
+        return "Enable INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE, and CHANGE_WIFI_MULTICAST_STATE in Android export permissions.";
+    }
+
+    private static string BuildSessionCreateFailureMessage(string operation, Error error)
+    {
+        if (IsAndroidRuntime() && error == Error.CantCreate)
+        {
+            return $"{operation}: {error}. Android could not create sockets. {AndroidPermissionHint()}";
+        }
+
+        return $"{operation}: {error}.";
+    }
+
+    private static string BuildDiscoveryBindFailureMessage(Error error)
+    {
+        var baseMessage = $"Discovery bind failed on ports {DiscoveryPort}-{DiscoveryPort + DiscoveryPortRangeSize - 1}: {error}.";
+        if (IsAndroidRuntime() && error == Error.CantCreate)
+        {
+            return $"{baseMessage} Android could not create UDP sockets. {AndroidPermissionHint()} Auto discovery unavailable on this network/device. Use Direct IP.";
+        }
+
+        if (IsAndroidRuntime())
+        {
+            return $"{baseMessage} Auto discovery unavailable on this network/device. Use Direct IP.";
+        }
+
+        return baseMessage;
     }
 
     private static string GetPreferredLocalAddress()

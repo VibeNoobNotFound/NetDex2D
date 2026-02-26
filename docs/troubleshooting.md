@@ -19,6 +19,13 @@ If still failing:
 - Close extra instances.
 - Restart game instances.
 
+Android note:
+
+- If error includes `CantCreate`, check Android export permissions in `src/export_presets.cfg`.
+- Required: `internet`, `access_network_state`, `access_wifi_state`, `change_wifi_multicast_state`.
+- You can validate with: `bash src/tools/check_android_export_permissions.sh`
+- If auto discovery is blocked by network/router, use Direct IP join.
+
 ## 2) Room list flickers / selection resets
 
 Current behavior includes stabilization:
