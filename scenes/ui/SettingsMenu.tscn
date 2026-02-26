@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://settingsmenu"]
+[gd_scene load_steps=2 format=3 uid="uid://settingsmenu"]
 
 [ext_resource type="Script" path="res://scripts/ui/SettingsMenu.cs" id="1_set"]
 
@@ -20,37 +20,69 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.12, 0.12, 0.12, 1)
 
-[node name="VBoxContainer" type="VBoxContainer" parent="."]
+[node name="CenterContainer" type="CenterContainer" parent="."]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -150.0
-offset_top = -100.0
-offset_right = 150.0
-offset_bottom = 100.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 20
 
-[node name="Label" type="Label" parent="VBoxContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(400, 0)
+theme_override_constants/separation = 12
+
+[node name="Label" type="Label" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 36
 text = "Settings"
 horizontal_alignment = 1
 
-[node name="VolumeLabel" type="Label" parent="VBoxContainer"]
+[node name="HSeparator1" type="HSeparator" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="VolumeLabel" type="Label" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 text = "Master Volume"
 horizontal_alignment = 1
 
-[node name="HSlider" type="HSlider" parent="VBoxContainer"]
+[node name="VolumeSlider" type="HSlider" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 value = 80.0
 
-[node name="BackButton" type="Button" parent="VBoxContainer"]
+[node name="HSeparator2" type="HSeparator" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="DisplayLabel" type="Label" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Display Settings"
+horizontal_alignment = 1
+
+[node name="FullscreenToggle" type="CheckButton" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+text = "Fullscreen"
+
+[node name="HSeparator3" type="HSeparator" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="QualityLabel" type="Label" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+text = "Render Quality: 100%"
+horizontal_alignment = 1
+
+[node name="ResolutionSlider" type="HSlider" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+min_value = 25.0
+max_value = 100.0
+value = 100.0
+step = 5.0
+
+[node name="HSeparator4" type="HSeparator" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="BackButton" type="Button" parent="CenterContainer/VBoxContainer"]
 custom_minimum_size = Vector2(150, 50)
 layout_mode = 2
 size_flags_horizontal = 4

@@ -11,6 +11,11 @@ public partial class GameScreen : Control
 
     private PackedScene _cardScene;
 
+    // Sound effects
+    private AudioStreamOggVorbis[] _placeSounds;
+    private AudioStreamOggVorbis[] _slideSounds;
+    private AudioStreamPlayer _sfxPlayer;
+
     public override void _Ready()
     {
         _bottomHand = GetNode<HBoxContainer>("BottomHand");
@@ -20,6 +25,24 @@ public partial class GameScreen : Control
         _desk = GetNode<Control>("Desk");
 
         _cardScene = GD.Load<PackedScene>("res://scenes/game/Card.tscn");
+
+        // Load sound effects
+        _placeSounds = new AudioStreamOggVorbis[]
+        {
+            GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardPlace1.ogg"),
+            GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardPlace2.ogg"),
+            GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardPlace3.ogg"),
+        };
+        _slideSounds = new AudioStreamOggVorbis[]
+        {
+            GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardSlide1.ogg"),
+            GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardSlide2.ogg"),
+            GD.Load<AudioStreamOggVorbis>("res://assets/sounds/cardSlide3.ogg"),
+        };
+
+        // Create an AudioStreamPlayer for SFX
+        _sfxPlayer = new AudioStreamPlayer();
+        AddChild(_sfxPlayer);
 
         // Deal dummy cards for testing
         TestCardDeal();
@@ -35,9 +58,16 @@ public partial class GameScreen : Control
                 var pauseMenu = pauseMenuScene.Instantiate<Control>();
                 pauseMenu.Name = "PauseMenu";
                 AddChild(pauseMenu);
-                pauseMenu.Show(); // Make sure it's visible if hidden by default
+                pauseMenu.Show();
             }
         }
+    }
+
+    private void PlaySound(AudioStreamOggVorbis[] sounds)
+    {
+        if (sounds.Length == 0) return;
+        _sfxPlayer.Stream = sounds[GD.RandRange(0, sounds.Length - 1)];
+        _sfxPlayer.Play();
     }
 
     public void AddCardToHand(int playerId, Card.SuitType suit, Card.RankType rank, bool faceUp)
@@ -54,6 +84,9 @@ public partial class GameScreen : Control
 
         card.Setup(suit, rank, faceUp);
         card.CardClicked += OnCardClicked;
+
+        // Play a slide sound when a card is dealt
+        PlaySound(_slideSounds);
     }
 
     private void TestCardDeal()
@@ -76,7 +109,6 @@ public partial class GameScreen : Control
 
     private void OnCardClicked(Card card)
     {
-        // For testing, if it's in a hand, play it to the desk
         if (card.GetParent() == _bottomHand || card.GetParent() == _topHand || card.GetParent() == _leftHand || card.GetParent() == _rightHand)
         {
             PlayCardToDesk(card);
@@ -85,20 +117,22 @@ public partial class GameScreen : Control
 
     public void PlayCardToDesk(Card card)
     {
-        card.CardClicked -= OnCardClicked; // Don't allow clicking again on desk
+        card.CardClicked -= OnCardClicked;
 
         var startGlobalPos = card.GlobalPosition;
         card.GetParent().RemoveChild(card);
         _desk.AddChild(card);
 
-        // Put it in center but slightly random offset for desk cards
         Vector2 targetPos = _desk.Size / 2 - card.Size / 2;
         targetPos += new Vector2((float)GD.RandRange(-40, 40), (float)GD.RandRange(-40, 40));
 
         card.GlobalPosition = startGlobalPos;
-        card.SetFaceUp(true); // Always face up on desk
+        card.SetFaceUp(true);
 
-        using var tween = CreateTween();
+        // Play card placement sound
+        PlaySound(_placeSounds);
+
+        var tween = CreateTween();
         tween.SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
         tween.TweenProperty(card, "position", targetPos, 0.3f);
     }
