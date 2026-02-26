@@ -171,11 +171,31 @@ public partial class LobbyScreen : Control
             return;
         }
 
+        // Snapshot selected targets first to avoid live UI refreshes mutating reads mid-apply.
+        var requestedSeats = new Dictionary<SeatPosition, int>();
         foreach (var pair in _seatOptions)
         {
-            var seat = pair.Key;
-            var option = pair.Value;
-            var peerId = option.GetSelectedId();
+            requestedSeats[pair.Key] = pair.Value.GetSelectedId();
+        }
+
+        var duplicatePeer = requestedSeats.Values
+            .Where(peerId => peerId > 0)
+            .GroupBy(peerId => peerId)
+            .FirstOrDefault(group => group.Count() > 1);
+
+        if (duplicatePeer != null)
+        {
+            var room = LobbyManager.Instance.CurrentRoom;
+            var duplicateName = room != null && room.Participants.TryGetValue(duplicatePeer.Key, out var participant)
+                ? participant.Name
+                : $"Peer {duplicatePeer.Key}";
+            SetStatus($"Seat assignment invalid: '{duplicateName}' is selected more than once.");
+            return;
+        }
+
+        foreach (SeatPosition seat in System.Enum.GetValues(typeof(SeatPosition)))
+        {
+            var peerId = requestedSeats.TryGetValue(seat, out var selectedPeer) ? selectedPeer : -1;
             NetworkRpc.Instance.SendSeatChangeRequest(seat, peerId);
         }
 
