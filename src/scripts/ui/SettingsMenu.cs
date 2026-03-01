@@ -20,6 +20,7 @@ public partial class SettingsMenu : Control
 
         var backBtn = vbox.GetNode<Button>("BackButton");
         backBtn.Pressed += OnBackPressed;
+        vbox.GetNode<Button>("AboutButton").Pressed += OnAboutPressed;
 
         _fullscreenToggle = vbox.GetNode<CheckButton>("FullscreenToggle");
         _resolutionSlider = vbox.GetNode<HSlider>("ResolutionSlider");
@@ -157,5 +158,10 @@ public partial class SettingsMenu : Control
     private static void OnBackPressed()
     {
         GameManager.Instance?.ReturnFromSettings();
+    }
+
+    private static void OnAboutPressed()
+    {
+        GameManager.Instance?.LoadAboutScreen("SettingsMenu");
     }
 }

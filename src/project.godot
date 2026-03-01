@@ -15,6 +15,10 @@ config/version="1.2"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.6", "C#", "GL Compatibility")
 config/icon="res://icon.svg"
+config/developer_name="NoobNotFound"
+config/copyright_notice="(c) VibeNoobNotFound"
+config/repository_url="https://github.com/NoobNotFound/net-dex"
+config/releases_url="https://github.com/NoobNotFound/net-dex/releases"
 
 [autoload]
 
@@ -25,6 +29,7 @@ NetworkRpc="*res://scripts/network/NetworkRpc.cs"
 NetworkManager="*res://scripts/network/NetworkManager.cs"
 AiCoordinator="*res://scripts/ai/AiCoordinator.cs"
 AudioManager="*res://scripts/managers/AudioManager.cs"
+UpdateManager="*res://scripts/updates/UpdateManager.cs"
 
 [display]
 

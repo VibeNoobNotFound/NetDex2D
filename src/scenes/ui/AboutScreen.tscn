@@ -1,0 +1,147 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/AboutScreen.cs" id="1_about"]
+[ext_resource type="Script" path="res://scripts/ui/common/MobileScrollContainer.cs" id="2_scroll"]
+
+[node name="AboutScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_about")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.04, 0.03, 0.03, 0.5)
+
+[node name="ScrollContainer" type="ScrollContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_scroll")
+
+[node name="MarginContainer" type="MarginContainer" parent="ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 20
+
+[node name="CenterContainer" type="CenterContainer" parent="ScrollContainer/MarginContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="MainPanel" type="PanelContainer" parent="ScrollContainer/MarginContainer/CenterContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(420, 760)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TitleLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 38
+text = "About"
+horizontal_alignment = 1
+
+[node name="GameNameLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "Game: NetDex"
+
+[node name="VersionLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "Version: 0.0.0"
+
+[node name="PlatformLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "Platform: Unknown"
+
+[node name="HSeparatorInfo" type="HSeparator" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="DeveloperLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "Developer: -"
+
+[node name="CopyrightLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "Copyright: -"
+autowrap_mode = 2
+
+[node name="RepoUrlLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "Repo: -"
+autowrap_mode = 2
+
+[node name="ReleasesUrlLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "Releases: -"
+autowrap_mode = 2
+
+[node name="LinksRow" type="HBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="OpenRepoButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/LinksRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Open Repository"
+
+[node name="OpenReleasesButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/LinksRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Open Releases"
+
+[node name="HSeparatorUpdate" type="HSeparator" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="UpdateSectionLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Updates"
+horizontal_alignment = 1
+
+[node name="UpdateStatusLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "Update Status: Not checked yet."
+autowrap_mode = 2
+
+[node name="LatestVersionLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "Latest version: unknown"
+
+[node name="CheckUpdatesButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Check for Updates"
+
+[node name="UpdateActionButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+disabled = true
+text = "Update"
+
+[node name="SkipUpdateButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+disabled = true
+text = "Skip This Version"
+
+[node name="BackButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Back"

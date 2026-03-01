@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" uid="uid://joinscreen" path="res://scenes/ui/JoinScreen.tscn" id="6_join"]
 [ext_resource type="Theme" path="res://assets/themes/NetDexModernTheme.tres" id="7_theme"]
 [ext_resource type="Texture2D" path="res://assets/images/background-red.jpg" id="8_bg"]
+[ext_resource type="PackedScene" path="res://scenes/ui/AboutScreen.tscn" id="9_about"]
 
 [node name="Main" type="Control" unique_id=665908007]
 layout_mode = 3
@@ -50,6 +51,10 @@ visible = false
 layout_mode = 1
 
 [node name="JoinScreen" parent="." unique_id=581452336 instance=ExtResource("6_join")]
+visible = false
+layout_mode = 1
+
+[node name="AboutScreen" parent="." instance=ExtResource("9_about")]
 visible = false
 layout_mode = 1
 

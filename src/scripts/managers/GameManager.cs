@@ -11,11 +11,13 @@ public partial class GameManager : Node
         "JoinScreen",
         "LobbyScreen",
         "GameScreen",
-        "SettingsMenu"
+        "SettingsMenu",
+        "AboutScreen"
     };
 
     public static GameManager Instance { get; private set; } = null!;
     private string _settingsReturnScreen = "MainMenu";
+    private string _aboutReturnScreen = "MainMenu";
 
     public override void _Ready()
     {
@@ -42,6 +44,17 @@ public partial class GameManager : Node
     public void LoadJoinScreen() => SetMenuState("JoinScreen");
     public void LoadLobby() => SetMenuState("LobbyScreen");
     public void LoadGameScene() => SetMenuState("GameScreen");
+    public void LoadAboutScreen(string returnScreen = "MainMenu")
+    {
+        _aboutReturnScreen = string.IsNullOrWhiteSpace(returnScreen) ? "MainMenu" : returnScreen;
+        SetMenuState("AboutScreen");
+    }
+
+    public void ReturnFromAbout()
+    {
+        SetMenuState(_aboutReturnScreen);
+    }
+
     public void LoadSettingsMenu(string returnScreen = "MainMenu")
     {
         _settingsReturnScreen = string.IsNullOrWhiteSpace(returnScreen) ? "MainMenu" : returnScreen;
