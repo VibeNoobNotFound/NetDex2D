@@ -5,9 +5,11 @@ namespace NetDex.Updates;
 public enum UpdatePlatform
 {
     MacOS = 0,
-    Android = 1,
-    IOS = 2,
-    Unsupported = 3
+    Windows = 1,
+    Linux = 2,
+    Android = 3,
+    IOS = 4,
+    Unsupported = 5
 }
 
 public enum UpdateState

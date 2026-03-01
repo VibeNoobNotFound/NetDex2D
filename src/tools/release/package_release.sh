@@ -9,12 +9,16 @@ echo "Packaging release artifacts into: $OUT_DIR"
 
 echo "Expected files to upload to GitHub Release:"
 echo "  - netdex-macos-universal.zip"
+echo "  - netdex-windows-x64.zip"
+echo "  - netdex-linux-x64.zip"
 echo "  - netdex-android-arm64.apk"
 
 echo
 echo "Example commands:"
 echo "  cp /path/to/exported/NetDex.app \"$OUT_DIR/NetDex.app\""
 echo "  (cd \"$OUT_DIR\" && zip -r netdex-macos-universal.zip NetDex.app)"
+echo "  cp /path/to/exported/NetDex-Windows.zip \"$OUT_DIR/netdex-windows-x64.zip\""
+echo "  cp /path/to/exported/NetDex-Linux.zip \"$OUT_DIR/netdex-linux-x64.zip\""
 echo "  cp /path/to/exported/NetDex.apk \"$OUT_DIR/netdex-android-arm64.apk\""
 
 echo

@@ -15,6 +15,8 @@ public partial class UpdateManager : Node
     private const string DefaultRepoName = "net-dex";
 
     private const string MacAssetName = "netdex-macos-universal.zip";
+    private const string WindowsAssetName = "netdex-windows-x64.zip";
+    private const string LinuxAssetName = "netdex-linux-x64.zip";
     private const string AndroidAssetName = "netdex-android-arm64.apk";
 
     private const double AutoCheckIntervalSeconds = 6 * 60 * 60;
@@ -78,6 +80,8 @@ public partial class UpdateManager : Node
         }
 
         _installers[UpdatePlatform.MacOS] = new MacOsUpdateInstaller();
+        _installers[UpdatePlatform.Windows] = new WindowsUpdateInstaller();
+        _installers[UpdatePlatform.Linux] = new LinuxUpdateInstaller();
         _installers[UpdatePlatform.Android] = new AndroidBrowserInstaller();
         _installers[UpdatePlatform.IOS] = new IosManualInstaller();
 
@@ -119,6 +123,7 @@ public partial class UpdateManager : Node
 
             if (!query.Success || query.Release == null)
             {
+                IsUpdateAvailable = false;
                 var code = query.IssueCode ?? UpdateIssueCode.NetworkError;
                 SetError(code, query.Message);
                 SaveUpdaterConfig();
@@ -137,17 +142,17 @@ public partial class UpdateManager : Node
             }
 
             var platformAsset = ResolvePlatformAsset(query.Release, RuntimePlatform);
-            if ((RuntimePlatform == UpdatePlatform.MacOS || RuntimePlatform == UpdatePlatform.Android) && platformAsset == null)
+            if (RequiresReleaseAsset(RuntimePlatform) && platformAsset == null)
             {
                 IsUpdateAvailable = false;
                 SetError(UpdateIssueCode.AssetMissing, "Latest release does not contain required asset for this platform.");
                 return;
             }
 
-            if (RuntimePlatform == UpdatePlatform.MacOS && !ChecksumVerifier.TryParseSha256Digest(platformAsset!.Digest, out _))
+            if (RequiresDigestValidation(RuntimePlatform) && !ChecksumVerifier.TryParseSha256Digest(platformAsset!.Digest, out _))
             {
                 IsUpdateAvailable = false;
-                SetError(UpdateIssueCode.DigestMissing, "Release digest is missing or invalid for macOS update asset.");
+                SetError(UpdateIssueCode.DigestMissing, "Release digest is missing or invalid for desktop update asset.");
                 return;
             }
 
@@ -198,10 +203,10 @@ public partial class UpdateManager : Node
 
         try
         {
-            if (RuntimePlatform == UpdatePlatform.MacOS)
+            if (IsDesktopInstaller(RuntimePlatform))
             {
                 SetState(UpdateState.Downloading, "Downloading update package...");
-                _downloadPathTemp = "user://updates/netdex-macos-universal.zip.download";
+                _downloadPathTemp = $"user://updates/{GetDownloadFileName(RuntimePlatform)}.download";
                 SaveUpdaterConfig();
             }
             else
@@ -221,7 +226,7 @@ public partial class UpdateManager : Node
             _downloadPathTemp = string.Empty;
             SaveUpdaterConfig();
 
-            if (RuntimePlatform == UpdatePlatform.MacOS)
+            if (IsDesktopInstaller(RuntimePlatform))
             {
                 SetState(UpdateState.Installing, result.Message);
                 GetTree().Quit();
@@ -281,6 +286,16 @@ public partial class UpdateManager : Node
             return FindAssetByName(release, MacAssetName);
         }
 
+        if (platform == UpdatePlatform.Windows)
+        {
+            return FindAssetByName(release, WindowsAssetName);
+        }
+
+        if (platform == UpdatePlatform.Linux)
+        {
+            return FindAssetByName(release, LinuxAssetName);
+        }
+
         if (platform == UpdatePlatform.Android)
         {
             return FindAssetByName(release, AndroidAssetName);
@@ -328,6 +343,16 @@ public partial class UpdateManager : Node
 
     private static UpdatePlatform DetectRuntimePlatform()
     {
+        if (OS.HasFeature("windows"))
+        {
+            return UpdatePlatform.Windows;
+        }
+
+        if (OS.HasFeature("linuxbsd") || OS.HasFeature("linux") || OS.HasFeature("x11"))
+        {
+            return UpdatePlatform.Linux;
+        }
+
         if (OS.HasFeature("macos"))
         {
             return UpdatePlatform.MacOS;
@@ -376,5 +401,31 @@ public partial class UpdateManager : Node
 
         var value = ProjectSettings.GetSetting(key, fallback).AsString();
         return string.IsNullOrWhiteSpace(value) ? fallback : value;
+    }
+
+    private static bool IsDesktopInstaller(UpdatePlatform platform)
+    {
+        return platform is UpdatePlatform.MacOS or UpdatePlatform.Windows or UpdatePlatform.Linux;
+    }
+
+    private static bool RequiresReleaseAsset(UpdatePlatform platform)
+    {
+        return platform is UpdatePlatform.MacOS or UpdatePlatform.Windows or UpdatePlatform.Linux or UpdatePlatform.Android;
+    }
+
+    private static bool RequiresDigestValidation(UpdatePlatform platform)
+    {
+        return platform is UpdatePlatform.MacOS or UpdatePlatform.Windows or UpdatePlatform.Linux;
+    }
+
+    private static string GetDownloadFileName(UpdatePlatform platform)
+    {
+        return platform switch
+        {
+            UpdatePlatform.MacOS => "netdex-macos-universal.zip",
+            UpdatePlatform.Windows => "netdex-windows-x64.zip",
+            UpdatePlatform.Linux => "netdex-linux-x64.zip",
+            _ => "netdex-update-package"
+        };
     }
 }

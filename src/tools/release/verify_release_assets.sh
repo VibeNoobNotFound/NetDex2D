@@ -21,6 +21,8 @@ fi
 
 required=(
   "netdex-macos-universal.zip"
+  "netdex-windows-x64.zip"
+  "netdex-linux-x64.zip"
   "netdex-android-arm64.apk"
 )
 
@@ -31,6 +33,21 @@ for name in "${required[@]}"; do
     exit 1
   fi
   echo "OK: found $name"
+done
+
+desktop=(
+  "netdex-macos-universal.zip"
+  "netdex-windows-x64.zip"
+  "netdex-linux-x64.zip"
+)
+
+for name in "${desktop[@]}"; do
+  digest="$(printf '%s' "$json" | python3 -c "import json,sys; d=json.load(sys.stdin); print(next((a.get('digest','') for a in d.get('assets',[]) if a.get('name')=='$name'),''))")"
+  if [[ ! "$digest" =~ ^sha256:[0-9a-fA-F]{64}$ ]]; then
+    echo "ERROR: desktop asset '$name' is missing valid sha256 digest (got: '$digest')"
+    exit 1
+  fi
+  echo "OK: digest present for $name"
 done
 
 echo "Release verification passed for tag $tag"

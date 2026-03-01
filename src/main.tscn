@@ -6,8 +6,8 @@
 [ext_resource type="PackedScene" uid="uid://lobbyscreen" path="res://scenes/ui/LobbyScreen.tscn" id="4_lobby"]
 [ext_resource type="PackedScene" uid="uid://hostscreen" path="res://scenes/ui/HostScreen.tscn" id="5_host"]
 [ext_resource type="PackedScene" uid="uid://joinscreen" path="res://scenes/ui/JoinScreen.tscn" id="6_join"]
-[ext_resource type="Theme" path="res://assets/themes/NetDexModernTheme.tres" id="7_theme"]
-[ext_resource type="Texture2D" path="res://assets/images/background-red.jpg" id="8_bg"]
+[ext_resource type="Theme" uid="uid://cw8rwx6wmwqw1" path="res://assets/themes/NetDexModernTheme.tres" id="7_theme"]
+[ext_resource type="Texture2D" uid="uid://mku26sjwuy1p" path="res://assets/images/background-red.jpg" id="8_bg"]
 [ext_resource type="PackedScene" path="res://scenes/ui/AboutScreen.tscn" id="9_about"]
 
 [node name="Main" type="Control" unique_id=665908007]
@@ -19,7 +19,7 @@ grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("7_theme")
 
-[node name="GlobalBackground" type="TextureRect" parent="."]
+[node name="GlobalBackground" type="TextureRect" parent="." unique_id=1709040410]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -27,12 +27,18 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+texture = ExtResource("8_bg")
 expand_mode = 1
 stretch_mode = 6
-texture = ExtResource("8_bg")
 
 [node name="MainMenu" parent="." unique_id=358429399 instance=ExtResource("1_main")]
 layout_mode = 1
+
+[node name="Title" parent="MainMenu/CenterContainer/MainPanel/VBoxContainer" index="0"]
+text = "NetDex"
+
+[node name="Subtitle" parent="MainMenu/CenterContainer/MainPanel/VBoxContainer" index="1"]
+text = "Omi Multiplayer"
 
 [node name="SettingsMenu" parent="." unique_id=1422027264 instance=ExtResource("2_set")]
 visible = false
@@ -54,7 +60,7 @@ layout_mode = 1
 visible = false
 layout_mode = 1
 
-[node name="AboutScreen" parent="." instance=ExtResource("9_about")]
+[node name="AboutScreen" parent="." unique_id=1775961048 instance=ExtResource("9_about")]
 visible = false
 layout_mode = 1
 

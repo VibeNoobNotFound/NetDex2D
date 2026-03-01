@@ -70,7 +70,7 @@ public partial class SettingsMenu : Control
 
     private void OnQualitySliderChanged(double value)
     {
-        _qualityLabel.Text = $"Render Quality: {(int)value}%";
+        _qualityLabel.Text = $"Render Scale: {(int)value}%";
         GetWindow().ContentScaleFactor = (float)(value / 100.0);
         SaveSettings();
     }
@@ -144,7 +144,7 @@ public partial class SettingsMenu : Control
         }
 
         _resolutionSlider.SetValueNoSignal(quality);
-        _qualityLabel.Text = $"Render Quality: {(int)quality}%";
+        _qualityLabel.Text = $"Render Scale: {(int)quality}%";
         GetWindow().ContentScaleFactor = (float)(quality / 100.0);
 
         _musicSlider.SetValueNoSignal(music);

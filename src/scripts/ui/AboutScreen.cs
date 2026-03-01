@@ -110,10 +110,10 @@ public partial class AboutScreen : Control
             developer = "NoobNotFound";
         }
 
-        var copyright = ProjectSettings.GetSetting("application/config/copyright_notice", "(c) VibeNoobNotFound").AsString();
+        var copyright = ProjectSettings.GetSetting("application/config/copyright_notice", "(c) NetDex").AsString();
         if (string.IsNullOrWhiteSpace(copyright))
         {
-            copyright = "(c) VibeNoobNotFound";
+            copyright = "(c) NetDex";
         }
 
         var updater = UpdateManager.Instance;

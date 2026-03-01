@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3 uid="uid://settingsmenu"]
+[gd_scene format=3 uid="uid://settingsmenu"]
 
-[ext_resource type="Script" path="res://scripts/ui/SettingsMenu.cs" id="1_set"]
+[ext_resource type="Script" uid="uid://b23h7ar8u8qpk" path="res://scripts/ui/SettingsMenu.cs" id="1_set"]
 
-[node name="SettingsMenu" type="Control"]
+[node name="SettingsMenu" type="Control" unique_id=1598340929]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -11,7 +11,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_set")
 
-[node name="ColorRect" type="ColorRect" parent="."]
+[node name="ColorRect" type="ColorRect" parent="." unique_id=787140769]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -20,7 +20,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.04, 0.03, 0.03, 0.5)
 
-[node name="CenterContainer" type="CenterContainer" parent="."]
+[node name="CenterContainer" type="CenterContainer" parent="." unique_id=1214846100]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -28,82 +28,79 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="MainPanel" type="PanelContainer" parent="CenterContainer"]
-layout_mode = 2
+[node name="MainPanel" type="PanelContainer" parent="CenterContainer" unique_id=337007470]
 custom_minimum_size = Vector2(520, 560)
-
-[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/MainPanel"]
 layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/MainPanel" unique_id=1620394684]
 custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="Label" type="Label" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="Label" type="Label" parent="CenterContainer/MainPanel/VBoxContainer" unique_id=639492376]
 layout_mode = 2
 theme_override_font_sizes/font_size = 36
 text = "Settings"
 horizontal_alignment = 1
 
-[node name="HSeparator1" type="HSeparator" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="HSeparator1" type="HSeparator" parent="CenterContainer/MainPanel/VBoxContainer" unique_id=971240194]
 layout_mode = 2
 
-[node name="MusicValueLabel" type="Label" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="MusicValueLabel" type="Label" parent="CenterContainer/MainPanel/VBoxContainer" unique_id=141056668]
 layout_mode = 2
 text = "Music Volume: 80%"
 horizontal_alignment = 1
 
-[node name="MusicVolumeSlider" type="HSlider" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="MusicVolumeSlider" type="HSlider" parent="CenterContainer/MainPanel/VBoxContainer" unique_id=705065184]
 layout_mode = 2
-max_value = 100.0
 value = 80.0
 
-[node name="SfxValueLabel" type="Label" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="SfxValueLabel" type="Label" parent="CenterContainer/MainPanel/VBoxContainer" unique_id=1678122022]
 layout_mode = 2
 text = "SFX Volume: 80%"
 horizontal_alignment = 1
 
-[node name="SfxVolumeSlider" type="HSlider" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="SfxVolumeSlider" type="HSlider" parent="CenterContainer/MainPanel/VBoxContainer" unique_id=1215684507]
 layout_mode = 2
-max_value = 100.0
 value = 80.0
 
-[node name="HSeparator2" type="HSeparator" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="HSeparator2" type="HSeparator" parent="CenterContainer/MainPanel/VBoxContainer" unique_id=230327012]
 layout_mode = 2
 
-[node name="DisplayLabel" type="Label" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="DisplayLabel" type="Label" parent="CenterContainer/MainPanel/VBoxContainer" unique_id=652371740]
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
 text = "Display Settings"
 horizontal_alignment = 1
 
-[node name="FullscreenToggle" type="CheckButton" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="FullscreenToggle" type="CheckButton" parent="CenterContainer/MainPanel/VBoxContainer" unique_id=1662862067]
 layout_mode = 2
 text = "Fullscreen"
 
-[node name="HSeparator3" type="HSeparator" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="HSeparator3" type="HSeparator" parent="CenterContainer/MainPanel/VBoxContainer" unique_id=1778811560]
 layout_mode = 2
 
-[node name="QualityLabel" type="Label" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="QualityLabel" type="Label" parent="CenterContainer/MainPanel/VBoxContainer" unique_id=792475606]
 layout_mode = 2
-text = "Render Quality: 100%"
+text = "Render Scale: 100%"
 horizontal_alignment = 1
 
-[node name="ResolutionSlider" type="HSlider" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="ResolutionSlider" type="HSlider" parent="CenterContainer/MainPanel/VBoxContainer" unique_id=1390383332]
 layout_mode = 2
 min_value = 25.0
-max_value = 100.0
-value = 100.0
 step = 5.0
+value = 100.0
 
-[node name="HSeparator4" type="HSeparator" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="HSeparator4" type="HSeparator" parent="CenterContainer/MainPanel/VBoxContainer" unique_id=724222860]
 layout_mode = 2
 
-[node name="BackButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="BackButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer" unique_id=1070925531]
 custom_minimum_size = Vector2(150, 50)
 layout_mode = 2
 size_flags_horizontal = 4
 text = "Back"
 
-[node name="AboutButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
+[node name="AboutButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer" unique_id=1271257918]
 custom_minimum_size = Vector2(150, 50)
 layout_mode = 2
 size_flags_horizontal = 4
