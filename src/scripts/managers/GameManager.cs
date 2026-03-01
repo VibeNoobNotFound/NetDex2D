@@ -26,6 +26,15 @@ public partial class GameManager : Node
         }
 
         Instance = this;
+        EnsureMobileFullscreen();
+    }
+
+    public override void _Notification(int what)
+    {
+        if (what == NotificationApplicationResumed)
+        {
+            EnsureMobileFullscreen();
+        }
     }
 
     public void LoadMainMenu() => SetMenuState("MainMenu");
@@ -87,5 +96,15 @@ public partial class GameManager : Node
         }
 
         return false;
+    }
+
+    private static void EnsureMobileFullscreen()
+    {
+        if (!OS.HasFeature("android") && !OS.HasFeature("ios"))
+        {
+            return;
+        }
+
+        DisplayServer.WindowSetMode(DisplayServer.WindowMode.Fullscreen);
     }
 }

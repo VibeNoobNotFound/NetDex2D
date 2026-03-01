@@ -12,6 +12,7 @@ public partial class SettingsMenu : Control
     private Label _sfxValueLabel = null!;
     private HSlider _musicSlider = null!;
     private HSlider _sfxSlider = null!;
+    private bool _isMobile;
 
     public override void _Ready()
     {
@@ -29,13 +30,13 @@ public partial class SettingsMenu : Control
         _sfxValueLabel = vbox.GetNode<Label>("SfxValueLabel");
 
         string platform = OS.GetName();
-        bool isMobile = platform == "Android" || platform == "iOS";
+        _isMobile = platform == "Android" || platform == "iOS";
 
         var displayLabel = vbox.GetNode<Label>("DisplayLabel");
-        displayLabel.Visible = !isMobile;
-        _fullscreenToggle.Visible = !isMobile;
-        vbox.GetNode<HSeparator>("HSeparator2").Visible = !isMobile;
-        vbox.GetNode<HSeparator>("HSeparator3").Visible = !isMobile;
+        displayLabel.Visible = !_isMobile;
+        _fullscreenToggle.Visible = !_isMobile;
+        vbox.GetNode<HSeparator>("HSeparator2").Visible = !_isMobile;
+        vbox.GetNode<HSeparator>("HSeparator3").Visible = !_isMobile;
 
         _qualityLabel.Visible = true;
         _resolutionSlider.Visible = true;
@@ -50,6 +51,11 @@ public partial class SettingsMenu : Control
 
     private void OnFullscreenToggled(bool toggled)
     {
+        if (_isMobile)
+        {
+            return;
+        }
+
         if (toggled)
         {
             DisplayServer.WindowSetMode(DisplayServer.WindowMode.ExclusiveFullscreen);
@@ -102,7 +108,7 @@ public partial class SettingsMenu : Control
         _sfxSlider.MaxValue = 100;
         _sfxSlider.Step = 1;
 
-        bool fullscreen = false;
+        bool fullscreen = !_isMobile;
         double quality = 100.0;
         var defaultMusic = AudioManager.Instance?.MusicVolumePercent ?? 80;
         var defaultSfx = AudioManager.Instance?.SfxVolumePercent ?? 80;
@@ -112,14 +118,22 @@ public partial class SettingsMenu : Control
         Error err = config.Load("user://settings.cfg");
         if (err == Error.Ok)
         {
-            fullscreen = (bool)config.GetValue("display", "fullscreen", false);
+            if (!_isMobile)
+            {
+                fullscreen = (bool)config.GetValue("display", "fullscreen", true);
+            }
             quality = (double)config.GetValue("display", "quality", 100.0);
             music = (double)config.GetValue("audio", "music_volume", defaultMusic);
             sfx = (double)config.GetValue("audio", "sfx_volume", defaultSfx);
         }
 
         _fullscreenToggle.SetPressedNoSignal(fullscreen);
-        if (fullscreen)
+        if (_isMobile)
+        {
+            // On Android/iOS, keep fullscreen to preserve immersive behavior.
+            DisplayServer.WindowSetMode(DisplayServer.WindowMode.Fullscreen);
+        }
+        else if (fullscreen)
         {
             DisplayServer.WindowSetMode(DisplayServer.WindowMode.ExclusiveFullscreen);
         }
