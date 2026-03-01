@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://lobbyscreen"]
 
 [ext_resource type="Script" path="res://scripts/ui/LobbyScreen.cs" id="1_lobby"]
+[ext_resource type="Script" path="res://scripts/ui/common/MobileScrollContainer.cs" id="2_scroll"]
 
 [node name="LobbyScreen" type="Control"]
 layout_mode = 3
@@ -20,164 +21,170 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.04, 0.03, 0.03, 0.5)
 
-[node name="MarginContainer" type="MarginContainer" parent="."]
+[node name="ScrollContainer" type="ScrollContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+script = ExtResource("2_scroll")
+
+[node name="MarginContainer" type="MarginContainer" parent="ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/margin_left = 24
 theme_override_constants/margin_top = 24
 theme_override_constants/margin_right = 24
 theme_override_constants/margin_bottom = 24
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="ScrollContainer/MarginContainer"]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="RoomLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="RoomLabel" type="Label" parent="ScrollContainer/MarginContainer/VBoxContainer"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 28
 text = "Room"
 
-[node name="StatusLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="StatusLabel" type="Label" parent="ScrollContainer/MarginContainer/VBoxContainer"]
 layout_mode = 2
 text = "Status"
 autowrap_mode = 2
 
-[node name="HBox" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+[node name="HBox" type="HBoxContainer" parent="ScrollContainer/MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 14
 
-[node name="PlayersPanel" type="PanelContainer" parent="MarginContainer/VBoxContainer/HBox"]
+[node name="PlayersPanel" type="PanelContainer" parent="ScrollContainer/MarginContainer/VBoxContainer/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="PlayersVBox" type="VBoxContainer" parent="MarginContainer/VBoxContainer/HBox/PlayersPanel"]
+[node name="PlayersVBox" type="VBoxContainer" parent="ScrollContainer/MarginContainer/VBoxContainer/HBox/PlayersPanel"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="PlayersLabel" type="Label" parent="MarginContainer/VBoxContainer/HBox/PlayersPanel/PlayersVBox"]
+[node name="PlayersLabel" type="Label" parent="ScrollContainer/MarginContainer/VBoxContainer/HBox/PlayersPanel/PlayersVBox"]
 layout_mode = 2
 text = "Players"
 
-[node name="PlayersList" type="ItemList" parent="MarginContainer/VBoxContainer/HBox/PlayersPanel/PlayersVBox"]
+[node name="PlayersList" type="ItemList" parent="ScrollContainer/MarginContainer/VBoxContainer/HBox/PlayersPanel/PlayersVBox"]
 custom_minimum_size = Vector2(0, 180)
 layout_mode = 2
 
-[node name="SpectatorsPanel" type="PanelContainer" parent="MarginContainer/VBoxContainer/HBox"]
+[node name="SpectatorsPanel" type="PanelContainer" parent="ScrollContainer/MarginContainer/VBoxContainer/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="SpectatorsVBox" type="VBoxContainer" parent="MarginContainer/VBoxContainer/HBox/SpectatorsPanel"]
+[node name="SpectatorsVBox" type="VBoxContainer" parent="ScrollContainer/MarginContainer/VBoxContainer/HBox/SpectatorsPanel"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="SpectatorsLabel" type="Label" parent="MarginContainer/VBoxContainer/HBox/SpectatorsPanel/SpectatorsVBox"]
+[node name="SpectatorsLabel" type="Label" parent="ScrollContainer/MarginContainer/VBoxContainer/HBox/SpectatorsPanel/SpectatorsVBox"]
 layout_mode = 2
 text = "Spectators"
 
-[node name="SpectatorsList" type="ItemList" parent="MarginContainer/VBoxContainer/HBox/SpectatorsPanel/SpectatorsVBox"]
+[node name="SpectatorsList" type="ItemList" parent="ScrollContainer/MarginContainer/VBoxContainer/HBox/SpectatorsPanel/SpectatorsVBox"]
 custom_minimum_size = Vector2(0, 180)
 layout_mode = 2
 
-[node name="SeatsPanel" type="PanelContainer" parent="MarginContainer/VBoxContainer"]
+[node name="SeatsPanel" type="PanelContainer" parent="ScrollContainer/MarginContainer/VBoxContainer"]
 layout_mode = 2
 
-[node name="SeatsVBox" type="VBoxContainer" parent="MarginContainer/VBoxContainer/SeatsPanel"]
+[node name="SeatsVBox" type="VBoxContainer" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="SeatsTitle" type="Label" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox"]
+[node name="SeatsTitle" type="Label" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox"]
 layout_mode = 2
 text = "Host Seat Assignment"
 
-[node name="AiOptions" type="VBoxContainer" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox"]
+[node name="AiOptions" type="VBoxContainer" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox"]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="AiAutoFillCheck" type="CheckButton" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions"]
+[node name="AiAutoFillCheck" type="CheckButton" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions"]
 layout_mode = 2
 button_pressed = true
 text = "Auto-fill empty seats with AI"
 
-[node name="AiDifficultyRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions"]
+[node name="AiDifficultyRow" type="HBoxContainer" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="AiDifficultyLabel" type="Label" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions/AiDifficultyRow"]
+[node name="AiDifficultyLabel" type="Label" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions/AiDifficultyRow"]
 layout_mode = 2
 text = "AI Difficulty"
 
-[node name="AiDifficultyOption" type="OptionButton" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions/AiDifficultyRow"]
+[node name="AiDifficultyOption" type="OptionButton" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions/AiDifficultyRow"]
 layout_mode = 2
 
-[node name="SeatsGrid" type="GridContainer" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox"]
+[node name="SeatsGrid" type="GridContainer" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox"]
 layout_mode = 2
 columns = 2
 
-[node name="BottomLabel" type="Label" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
+[node name="BottomLabel" type="Label" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
 layout_mode = 2
 text = "Bottom"
 
-[node name="BottomSeatOption" type="OptionButton" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
+[node name="BottomSeatOption" type="OptionButton" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
 layout_mode = 2
 
-[node name="RightLabel" type="Label" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
+[node name="RightLabel" type="Label" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
 layout_mode = 2
 text = "Right"
 
-[node name="RightSeatOption" type="OptionButton" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
+[node name="RightSeatOption" type="OptionButton" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
 layout_mode = 2
 
-[node name="TopLabel" type="Label" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
+[node name="TopLabel" type="Label" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
 layout_mode = 2
 text = "Top"
 
-[node name="TopSeatOption" type="OptionButton" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
+[node name="TopSeatOption" type="OptionButton" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
 layout_mode = 2
 
-[node name="LeftLabel" type="Label" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
+[node name="LeftLabel" type="Label" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
 layout_mode = 2
 text = "Left"
 
-[node name="LeftSeatOption" type="OptionButton" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
+[node name="LeftSeatOption" type="OptionButton" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid"]
 layout_mode = 2
 
-[node name="SeatsActions" type="HBoxContainer" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox"]
+[node name="SeatsActions" type="HBoxContainer" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox"]
 layout_mode = 2
 alignment = 2
 
-[node name="ApplySeatsButton" type="Button" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsActions"]
+[node name="ApplySeatsButton" type="Button" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsActions"]
 layout_mode = 2
 text = "Apply Seats"
 
-[node name="AiActions" type="HBoxContainer" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox"]
+[node name="AiActions" type="HBoxContainer" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox"]
 layout_mode = 2
 alignment = 2
 
-[node name="ApplyAiSettingsButton" type="Button" parent="MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiActions"]
+[node name="ApplyAiSettingsButton" type="Button" parent="ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiActions"]
 layout_mode = 2
 text = "Apply AI Settings"
 
-[node name="Actions" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+[node name="Actions" type="HBoxContainer" parent="ScrollContainer/MarginContainer/VBoxContainer"]
 layout_mode = 2
 alignment = 1
 theme_override_constants/separation = 10
 
-[node name="StartMatchButton" type="Button" parent="MarginContainer/VBoxContainer/Actions"]
+[node name="StartMatchButton" type="Button" parent="ScrollContainer/MarginContainer/VBoxContainer/Actions"]
 custom_minimum_size = Vector2(180, 42)
 layout_mode = 2
 text = "Start Match"
 
-[node name="ReturnToGameButton" type="Button" parent="MarginContainer/VBoxContainer/Actions"]
+[node name="ReturnToGameButton" type="Button" parent="ScrollContainer/MarginContainer/VBoxContainer/Actions"]
 custom_minimum_size = Vector2(180, 42)
 layout_mode = 2
 text = "Return to Game"
 
-[node name="LeaveRoomButton" type="Button" parent="MarginContainer/VBoxContainer/Actions"]
+[node name="LeaveRoomButton" type="Button" parent="ScrollContainer/MarginContainer/VBoxContainer/Actions"]
 custom_minimum_size = Vector2(180, 42)
 layout_mode = 2
 text = "Leave Room"

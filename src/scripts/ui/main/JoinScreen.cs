@@ -19,21 +19,21 @@ public partial class JoinScreen : Control
 
     public override void _Ready()
     {
-        _playerNameInput = GetNode<LineEdit>("CenterContainer/MainPanel/VBoxContainer/PlayerNameInput");
-        _directIpInput = GetNode<LineEdit>("CenterContainer/MainPanel/VBoxContainer/DirectIpInput");
-        _roomsList = GetNode<ItemList>("CenterContainer/MainPanel/VBoxContainer/DiscoveredRooms");
-        _statusLabel = GetNode<Label>("CenterContainer/MainPanel/VBoxContainer/StatusLabel");
+        _playerNameInput = GetNode<LineEdit>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/PlayerNameInput");
+        _directIpInput = GetNode<LineEdit>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/DirectIpInput");
+        _roomsList = GetNode<ItemList>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/DiscoveredRooms");
+        _statusLabel = GetNode<Label>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/StatusLabel");
 
         _playerNameInput.Text = NetworkManager.Instance.GetSavedPlayerName();
 
         _roomsList.ItemSelected += OnRoomSelected;
 
-        GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/RefreshRoomsButton").Pressed += OnRefreshPressed;
-        GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/JoinButton").Pressed += OnJoinAsPlayerPressed;
-        GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/SpectateButton").Pressed += OnJoinAsSpectatorPressed;
-        GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/DirectJoinButton").Pressed += OnDirectJoinPressed;
-        GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/DirectSpectateButton").Pressed += OnDirectSpectatePressed;
-        GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/BackButton").Pressed += OnBackPressed;
+        GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/RefreshRoomsButton").Pressed += OnRefreshPressed;
+        GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/JoinButton").Pressed += OnJoinAsPlayerPressed;
+        GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/SpectateButton").Pressed += OnJoinAsSpectatorPressed;
+        GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/DirectJoinButton").Pressed += OnDirectJoinPressed;
+        GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/DirectSpectateButton").Pressed += OnDirectSpectatePressed;
+        GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/BackButton").Pressed += OnBackPressed;
 
         NetworkManager.Instance.DiscoveryUpdated += RefreshRooms;
         NetworkManager.Instance.ConnectionStatusChanged += OnConnectionStatusChanged;

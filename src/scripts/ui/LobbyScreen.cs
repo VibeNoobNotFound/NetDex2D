@@ -29,34 +29,34 @@ public partial class LobbyScreen : Control
 
     public override void _Ready()
     {
-        _roomLabel = GetNode<Label>("MarginContainer/VBoxContainer/RoomLabel");
-        _statusLabel = GetNode<Label>("MarginContainer/VBoxContainer/StatusLabel");
-        _playersList = GetNode<ItemList>("MarginContainer/VBoxContainer/HBox/PlayersPanel/PlayersVBox/PlayersList");
-        _spectatorsList = GetNode<ItemList>("MarginContainer/VBoxContainer/HBox/SpectatorsPanel/SpectatorsVBox/SpectatorsList");
+        _roomLabel = GetNode<Label>("ScrollContainer/MarginContainer/VBoxContainer/RoomLabel");
+        _statusLabel = GetNode<Label>("ScrollContainer/MarginContainer/VBoxContainer/StatusLabel");
+        _playersList = GetNode<ItemList>("ScrollContainer/MarginContainer/VBoxContainer/HBox/PlayersPanel/PlayersVBox/PlayersList");
+        _spectatorsList = GetNode<ItemList>("ScrollContainer/MarginContainer/VBoxContainer/HBox/SpectatorsPanel/SpectatorsVBox/SpectatorsList");
 
-        _seatsPanel = GetNode<PanelContainer>("MarginContainer/VBoxContainer/SeatsPanel");
+        _seatsPanel = GetNode<PanelContainer>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel");
 
-        _seatOptions[SeatPosition.Bottom] = GetNode<OptionButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/BottomSeatOption");
-        _seatOptions[SeatPosition.Right] = GetNode<OptionButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/RightSeatOption");
-        _seatOptions[SeatPosition.Top] = GetNode<OptionButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/TopSeatOption");
-        _seatOptions[SeatPosition.Left] = GetNode<OptionButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/LeftSeatOption");
+        _seatOptions[SeatPosition.Bottom] = GetNode<OptionButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/BottomSeatOption");
+        _seatOptions[SeatPosition.Right] = GetNode<OptionButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/RightSeatOption");
+        _seatOptions[SeatPosition.Top] = GetNode<OptionButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/TopSeatOption");
+        _seatOptions[SeatPosition.Left] = GetNode<OptionButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/LeftSeatOption");
 
-        var applySeatsButton = GetNode<Button>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsActions/ApplySeatsButton");
+        var applySeatsButton = GetNode<Button>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsActions/ApplySeatsButton");
         applySeatsButton.Pressed += OnApplySeatsPressed;
 
-        _startMatchButton = GetNode<Button>("MarginContainer/VBoxContainer/Actions/StartMatchButton");
+        _startMatchButton = GetNode<Button>("ScrollContainer/MarginContainer/VBoxContainer/Actions/StartMatchButton");
         _startMatchButton.Pressed += OnStartMatchPressed;
 
-        _returnToGameButton = GetNode<Button>("MarginContainer/VBoxContainer/Actions/ReturnToGameButton");
+        _returnToGameButton = GetNode<Button>("ScrollContainer/MarginContainer/VBoxContainer/Actions/ReturnToGameButton");
         _returnToGameButton.Pressed += OnReturnToGamePressed;
 
-        _aiAutoFillCheck = GetNode<CheckButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions/AiAutoFillCheck");
-        _aiDifficultyOption = GetNode<OptionButton>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions/AiDifficultyRow/AiDifficultyOption");
-        _applyAiSettingsButton = GetNode<Button>("MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiActions/ApplyAiSettingsButton");
+        _aiAutoFillCheck = GetNode<CheckButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions/AiAutoFillCheck");
+        _aiDifficultyOption = GetNode<OptionButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions/AiDifficultyRow/AiDifficultyOption");
+        _applyAiSettingsButton = GetNode<Button>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiActions/ApplyAiSettingsButton");
         _applyAiSettingsButton.Pressed += OnApplyAiSettingsPressed;
         PopulateAiDifficultyOptions();
 
-        var leaveButton = GetNode<Button>("MarginContainer/VBoxContainer/Actions/LeaveRoomButton");
+        var leaveButton = GetNode<Button>("ScrollContainer/MarginContainer/VBoxContainer/Actions/LeaveRoomButton");
         leaveButton.Pressed += OnLeavePressed;
 
         LobbyManager.Instance.RoomStateChanged += RefreshLobbyView;

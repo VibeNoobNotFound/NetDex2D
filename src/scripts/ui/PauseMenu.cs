@@ -15,14 +15,6 @@ public partial class PauseMenu : Control
         GetNode<Button>("PanelContainer/VBoxContainer/LeaveButton").Pressed += OnLeavePressed;
     }
 
-    public override void _Input(InputEvent @event)
-    {
-        if (@event.IsActionPressed("ui_cancel"))
-        {
-            Visible = !Visible;
-        }
-    }
-
     private void OnResumePressed()
     {
         Hide();

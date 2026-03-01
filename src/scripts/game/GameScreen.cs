@@ -39,6 +39,7 @@ public partial class GameScreen : Control
     private Label _rightPlayerName = null!;
 
     private Label _statusLabel = null!;
+    private Button _mobilePauseButton = null!;
     private PanelContainer _actionPanel = null!;
     private Label _actionLabel = null!;
     private OptionButton _trumpOption = null!;
@@ -92,6 +93,7 @@ public partial class GameScreen : Control
         _rightPlayerName = GetNode<Label>("RightPlayerName");
 
         _statusLabel = GetNode<Label>("TopStatus");
+        _mobilePauseButton = GetNode<Button>("MobilePauseButton");
         _actionPanel = GetNode<PanelContainer>("ActionPanel");
         _actionLabel = GetNode<Label>("ActionPanel/VBoxContainer/ActionLabel");
         _trumpOption = GetNode<OptionButton>("ActionPanel/VBoxContainer/TrumpOption");
@@ -102,6 +104,8 @@ public partial class GameScreen : Control
         _trumpAnnouncementLabel = GetNode<Label>("AnimationLayer/TrumpAnnouncementPanel/AnnouncementMargin/AnnouncementLabel");
 
         GetNode<Button>("BackLobbyButton").Pressed += OnBackLobbyPressed;
+        _mobilePauseButton.Visible = OS.HasFeature("android") || OS.HasFeature("ios");
+        _mobilePauseButton.Pressed += OnMobilePausePressed;
         _actionButton.Pressed += OnActionButtonPressed;
         _secondaryActionButton.Pressed += OnSecondaryActionButtonPressed;
 
@@ -149,13 +153,10 @@ public partial class GameScreen : Control
 
     public override void _Input(InputEvent @event)
     {
-        if (@event.IsActionPressed("ui_cancel") && !HasNode("PauseMenu"))
+        if (@event.IsActionPressed("ui_cancel"))
         {
-            var pauseMenuScene = GD.Load<PackedScene>("res://scenes/ui/PauseMenu.tscn");
-            var pauseMenu = pauseMenuScene.Instantiate<Control>();
-            pauseMenu.Name = "PauseMenu";
-            AddChild(pauseMenu);
-            pauseMenu.Show();
+            TogglePauseMenu();
+            GetViewport().SetInputAsHandled();
         }
     }
 
@@ -669,6 +670,33 @@ public partial class GameScreen : Control
     private static void OnBackLobbyPressed()
     {
         GameManager.Instance?.LoadLobby();
+    }
+
+    private void OnMobilePausePressed()
+    {
+        TogglePauseMenu();
+    }
+
+    private void TogglePauseMenu()
+    {
+        var pauseMenu = GetNodeOrNull<Control>("PauseMenu");
+        if (pauseMenu == null)
+        {
+            pauseMenu = EnsurePauseMenu();
+            pauseMenu.Show();
+            return;
+        }
+
+        pauseMenu.Visible = !pauseMenu.Visible;
+    }
+
+    private Control EnsurePauseMenu()
+    {
+        var pauseMenuScene = GD.Load<PackedScene>("res://scenes/ui/PauseMenu.tscn");
+        var pauseMenu = pauseMenuScene.Instantiate<Control>();
+        pauseMenu.Name = "PauseMenu";
+        AddChild(pauseMenu);
+        return pauseMenu;
     }
 
     private Card CreateCard(CardModel model, bool faceUp, bool interactable, bool playRevealSound = false)

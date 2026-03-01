@@ -13,10 +13,10 @@ public partial class HostScreen : Control
 
     public override void _Ready()
     {
-        _playerNameInput = GetNode<LineEdit>("CenterContainer/MainPanel/VBoxContainer/PlayerNameInput");
-        _roomNameInput = GetNode<LineEdit>("CenterContainer/MainPanel/VBoxContainer/RoomNameInput");
-        _statusLabel = GetNode<Label>("CenterContainer/MainPanel/VBoxContainer/StatusLabel");
-        _hostIpLabel = GetNodeOrNull<Label>("CenterContainer/MainPanel/VBoxContainer/HostIpLabel");
+        _playerNameInput = GetNode<LineEdit>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/PlayerNameInput");
+        _roomNameInput = GetNode<LineEdit>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/RoomNameInput");
+        _statusLabel = GetNode<Label>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/StatusLabel");
+        _hostIpLabel = GetNodeOrNull<Label>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/HostIpLabel");
 
         _playerNameInput.Text = NetworkManager.Instance.GetSavedPlayerName();
         if (_hostIpLabel != null)
@@ -24,8 +24,8 @@ public partial class HostScreen : Control
             _hostIpLabel.Text = $"LAN IP: {NetworkManager.Instance.GetLocalLanAddress()}:{NetworkManager.GamePort}";
         }
 
-        GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/CreateHostButton").Pressed += OnCreateHostPressed;
-        GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/BackButton").Pressed += OnBackPressed;
+        GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/CreateHostButton").Pressed += OnCreateHostPressed;
+        GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/BackButton").Pressed += OnBackPressed;
 
         NetworkManager.Instance.ConnectionStatusChanged += OnConnectionStatusChanged;
         NetworkManager.Instance.NetworkMessage += OnNetworkMessage;
