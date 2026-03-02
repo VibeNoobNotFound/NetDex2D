@@ -21,7 +21,8 @@ fi
 
 required=(
   "netdex-macos-universal.zip"
-  "netdex-windows-x64.zip"
+  "netdex-windows-x86_64.zip"
+  "netdex-windows-arm64.zip"
   "netdex-linux-x64.zip"
   "netdex-android-arm64.apk"
 )
@@ -37,7 +38,8 @@ done
 
 desktop=(
   "netdex-macos-universal.zip"
-  "netdex-windows-x64.zip"
+  "netdex-windows-x86_64.zip"
+  "netdex-windows-arm64.zip"
   "netdex-linux-x64.zip"
 )
 

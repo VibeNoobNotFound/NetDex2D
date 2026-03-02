@@ -8,6 +8,13 @@ namespace NetDex.Updates;
 
 public partial class UpdateManager : Node
 {
+    private enum RuntimeArchitecture
+    {
+        Unknown = 0,
+        X86_64 = 1,
+        Arm64 = 2
+    }
+
     private const string UpdaterConfigPath = "user://updater.cfg";
     private const string DefaultRepositoryUrl = "https://github.com/NoobNotFound/net-dex";
     private const string DefaultReleasesUrl = "https://github.com/NoobNotFound/net-dex/releases";
@@ -15,7 +22,9 @@ public partial class UpdateManager : Node
     private const string DefaultRepoName = "net-dex";
 
     private const string MacAssetName = "netdex-macos-universal.zip";
-    private const string WindowsAssetName = "netdex-windows-x64.zip";
+    private const string WindowsX86_64AssetName = "netdex-windows-x86_64.zip";
+    private const string WindowsX64LegacyAssetName = "netdex-windows-x64.zip";
+    private const string WindowsArm64AssetName = "netdex-windows-arm64.zip";
     private const string LinuxAssetName = "netdex-linux-x64.zip";
     private const string AndroidAssetName = "netdex-android-arm64.apk";
 
@@ -33,6 +42,7 @@ public partial class UpdateManager : Node
     public string ReleasesUrl { get; private set; } = DefaultReleasesUrl;
 
     public UpdatePlatform RuntimePlatform { get; private set; } = UpdatePlatform.Unsupported;
+    private RuntimeArchitecture _runtimeArchitecture = RuntimeArchitecture.Unknown;
 
     private readonly GitHubReleaseProvider _provider = new();
     private readonly Dictionary<UpdatePlatform, IUpdateInstaller> _installers = new();
@@ -68,6 +78,7 @@ public partial class UpdateManager : Node
         Instance = this;
 
         RuntimePlatform = DetectRuntimePlatform();
+        _runtimeArchitecture = DetectRuntimeArchitecture();
         CurrentVersion = VersionComparer.NormalizeTagToVersion(ProjectSettings.GetSetting("application/config/version", "0.0.0").AsString());
 
         RepositoryUrl = GetProjectSettingString("application/config/repository_url", DefaultRepositoryUrl);
@@ -203,18 +214,19 @@ public partial class UpdateManager : Node
 
         try
         {
+            var platformAsset = ResolvePlatformAsset(LatestRelease, RuntimePlatform);
+
             if (IsDesktopInstaller(RuntimePlatform))
             {
                 SetState(UpdateState.Downloading, "Downloading update package...");
-                _downloadPathTemp = $"user://updates/{GetDownloadFileName(RuntimePlatform)}.download";
+                var downloadFileName = platformAsset?.Name ?? GetDownloadFileName(RuntimePlatform);
+                _downloadPathTemp = $"user://updates/{downloadFileName}.download";
                 SaveUpdaterConfig();
             }
             else
             {
                 SetState(UpdateState.Installing, "Opening update destination...");
             }
-
-            var platformAsset = ResolvePlatformAsset(LatestRelease, RuntimePlatform);
             var result = await installer.ExecuteAsync(this, LatestRelease, platformAsset);
             if (!result.Success)
             {
@@ -279,7 +291,7 @@ public partial class UpdateManager : Node
         EmitSignal(SignalName.UpdateIssueRaised, (int)code, message);
     }
 
-    private static UpdateAssetInfo? ResolvePlatformAsset(UpdateReleaseInfo release, UpdatePlatform platform)
+    private UpdateAssetInfo? ResolvePlatformAsset(UpdateReleaseInfo release, UpdatePlatform platform)
     {
         if (platform == UpdatePlatform.MacOS)
         {
@@ -288,7 +300,7 @@ public partial class UpdateManager : Node
 
         if (platform == UpdatePlatform.Windows)
         {
-            return FindAssetByName(release, WindowsAssetName);
+            return ResolveWindowsAsset(release);
         }
 
         if (platform == UpdatePlatform.Linux)
@@ -299,6 +311,30 @@ public partial class UpdateManager : Node
         if (platform == UpdatePlatform.Android)
         {
             return FindAssetByName(release, AndroidAssetName);
+        }
+
+        return null;
+    }
+
+    private UpdateAssetInfo? ResolveWindowsAsset(UpdateReleaseInfo release)
+    {
+        return _runtimeArchitecture switch
+        {
+            RuntimeArchitecture.Arm64 => FindAssetByNames(release, WindowsArm64AssetName),
+            RuntimeArchitecture.X86_64 => FindAssetByNames(release, WindowsX86_64AssetName, WindowsX64LegacyAssetName),
+            _ => FindAssetByNames(release, WindowsX86_64AssetName, WindowsX64LegacyAssetName, WindowsArm64AssetName)
+        };
+    }
+
+    private static UpdateAssetInfo? FindAssetByNames(UpdateReleaseInfo release, params string[] expectedNames)
+    {
+        foreach (var expectedName in expectedNames)
+        {
+            var asset = FindAssetByName(release, expectedName);
+            if (asset != null)
+            {
+                return asset;
+            }
         }
 
         return null;
@@ -371,6 +407,21 @@ public partial class UpdateManager : Node
         return UpdatePlatform.Unsupported;
     }
 
+    private static RuntimeArchitecture DetectRuntimeArchitecture()
+    {
+        if (OS.HasFeature("arm64") || OS.HasFeature("aarch64"))
+        {
+            return RuntimeArchitecture.Arm64;
+        }
+
+        if (OS.HasFeature("x86_64") || OS.HasFeature("x64") || OS.HasFeature("64"))
+        {
+            return RuntimeArchitecture.X86_64;
+        }
+
+        return RuntimeArchitecture.Unknown;
+    }
+
     private static bool TryParseOwnerRepoFromUrl(string repositoryUrl, out string owner, out string repo)
     {
         owner = string.Empty;
@@ -418,12 +469,14 @@ public partial class UpdateManager : Node
         return platform is UpdatePlatform.MacOS or UpdatePlatform.Windows or UpdatePlatform.Linux;
     }
 
-    private static string GetDownloadFileName(UpdatePlatform platform)
+    private string GetDownloadFileName(UpdatePlatform platform)
     {
         return platform switch
         {
             UpdatePlatform.MacOS => "netdex-macos-universal.zip",
-            UpdatePlatform.Windows => "netdex-windows-x64.zip",
+            UpdatePlatform.Windows => _runtimeArchitecture == RuntimeArchitecture.Arm64
+                ? WindowsArm64AssetName
+                : WindowsX86_64AssetName,
             UpdatePlatform.Linux => "netdex-linux-x64.zip",
             _ => "netdex-update-package"
         };

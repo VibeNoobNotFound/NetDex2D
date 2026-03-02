@@ -9,8 +9,8 @@ namespace NetDex.Updates.Installers;
 public sealed class WindowsUpdateInstaller : IUpdateInstaller
 {
     private const string UpdateDir = "user://updates";
-    private const string DownloadTempPath = "user://updates/netdex-windows-x64.zip.download";
-    private const string DownloadFinalPath = "user://updates/netdex-windows-x64.zip";
+    private const string DownloadTempPath = "user://updates/netdex-windows-update.zip.download";
+    private const string DownloadFinalPath = "user://updates/netdex-windows-update.zip";
     private const string ScriptPath = "user://updates/apply_update_windows.cmd";
 
     public UpdatePlatform Platform => UpdatePlatform.Windows;

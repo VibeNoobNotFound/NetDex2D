@@ -83,7 +83,8 @@ src/project.godot
 Expected release assets:
 
 - `netdex-macos-universal.zip`
-- `netdex-windows-x64.zip`
+- `netdex-windows-x86_64.zip`
+- `netdex-windows-arm64.zip`
 - `netdex-linux-x64.zip`
 - `netdex-android-arm64.apk`
 
