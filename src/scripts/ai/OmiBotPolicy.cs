@@ -19,6 +19,11 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
         int MaxReshuffles,
         double ExtraShuffleChance);
 
+    private sealed record OutcomeEstimate(
+        double AverageUtility,
+        double WinRate,
+        int Samples);
+
     public MatchCommand ChooseCommand(BotPerceptionState perception, IGameRulesEngine rulesEngine, CancellationToken cancellationToken)
     {
         var state = perception.PublicState;
@@ -37,6 +42,8 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
             OmiPhase.Cut => ChooseCutCommand(legal, random, perception.Difficulty),
             OmiPhase.TrumpSelect => ChooseTrumpCommand(legal, perception, rulesEngine, settings, random, cancellationToken),
             OmiPhase.TrickPlay => ChooseTrickPlayCommand(legal, perception, rulesEngine, settings, random, cancellationToken),
+            OmiPhase.KapothiProposal => ChooseKapothiProposalCommand(legal, perception, rulesEngine, settings, random, cancellationToken),
+            OmiPhase.KapothiResponse => ChooseKapothiResponseCommand(legal, perception, rulesEngine, settings, random, cancellationToken),
             _ => legal[0]
         };
     }
@@ -249,6 +256,103 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
         return best;
     }
 
+    private MatchCommand ChooseKapothiProposalCommand(
+        IReadOnlyList<MatchCommand> legal,
+        BotPerceptionState perception,
+        IGameRulesEngine rulesEngine,
+        SearchSettings settings,
+        Random random,
+        CancellationToken cancellationToken)
+    {
+        var propose = legal.FirstOrDefault(command => command.Type == MatchCommandType.KapothiPropose);
+        var skip = legal.FirstOrDefault(command => command.Type == MatchCommandType.KapothiSkip);
+        if (propose == null)
+        {
+            return skip ?? legal[0];
+        }
+
+        if (skip == null)
+        {
+            return propose;
+        }
+
+        var sampleCount = Math.Max(6, settings.MinSamplesPerCommand);
+        var proposeOutcome = EstimateOutcome(propose, perception, rulesEngine, random, cancellationToken, sampleCount);
+        var skipOutcome = EstimateOutcome(skip, perception, rulesEngine, random, cancellationToken, sampleCount);
+        if (proposeOutcome.Samples == 0)
+        {
+            return skip;
+        }
+
+        if (skipOutcome.Samples == 0)
+        {
+            return propose;
+        }
+
+        var aggressivenessBias = perception.Difficulty switch
+        {
+            AiDifficulty.Easy => -4.0,
+            AiDifficulty.Normal => -1.0,
+            _ => 1.5
+        };
+
+        return proposeOutcome.AverageUtility + aggressivenessBias >= skipOutcome.AverageUtility
+            ? propose
+            : skip;
+    }
+
+    private MatchCommand ChooseKapothiResponseCommand(
+        IReadOnlyList<MatchCommand> legal,
+        BotPerceptionState perception,
+        IGameRulesEngine rulesEngine,
+        SearchSettings settings,
+        Random random,
+        CancellationToken cancellationToken)
+    {
+        var accept = legal.FirstOrDefault(command => command.Type == MatchCommandType.KapothiAccept);
+        var reject = legal.FirstOrDefault(command => command.Type == MatchCommandType.KapothiReject);
+        if (accept == null)
+        {
+            return reject ?? legal[0];
+        }
+
+        if (reject == null)
+        {
+            return accept;
+        }
+
+        var sampleCount = Math.Max(8, settings.MinSamplesPerCommand + 2);
+        var acceptOutcome = EstimateOutcome(accept, perception, rulesEngine, random, cancellationToken, sampleCount);
+        var rejectOutcome = EstimateOutcome(reject, perception, rulesEngine, random, cancellationToken, sampleCount);
+        if (acceptOutcome.Samples == 0)
+        {
+            return reject;
+        }
+
+        if (rejectOutcome.Samples == 0)
+        {
+            return accept;
+        }
+
+        var comebackThreshold = perception.Difficulty switch
+        {
+            AiDifficulty.Easy => 0.28,
+            AiDifficulty.Normal => 0.42,
+            _ => 0.56
+        };
+
+        var acceptMargin = perception.Difficulty switch
+        {
+            AiDifficulty.Easy => 8.0,
+            AiDifficulty.Normal => 3.0,
+            _ => 0.0
+        };
+
+        var shouldAccept = acceptOutcome.WinRate >= comebackThreshold &&
+                           acceptOutcome.AverageUtility + acceptMargin >= rejectOutcome.AverageUtility;
+        return shouldAccept ? accept : reject;
+    }
+
     private double SimulateCandidate(
         MatchCommand candidate,
         BotPerceptionState perception,
@@ -265,6 +369,51 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
 
         RolloutToRoundEnd(simulated, perception.BotSeat, rulesEngine, random, cancellationToken);
         return EvaluateRoundUtility(simulated, perception.BotSeat.TeamIndex());
+    }
+
+    private OutcomeEstimate EstimateOutcome(
+        MatchCommand initialCommand,
+        BotPerceptionState perception,
+        IGameRulesEngine rulesEngine,
+        Random random,
+        CancellationToken cancellationToken,
+        int sampleCount)
+    {
+        var team = perception.BotSeat.TeamIndex();
+        var total = 0.0;
+        var wins = 0;
+        var samples = 0;
+
+        for (var i = 0; i < sampleCount; i++)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+
+            var simulated = SampleDeterminizedState(perception, random, strictVoidConstraints: true);
+            var applied = rulesEngine.ApplyCommand(simulated, initialCommand);
+            if (!applied.Success)
+            {
+                continue;
+            }
+
+            RolloutToRoundEnd(simulated, perception.BotSeat, rulesEngine, random, cancellationToken);
+            total += EvaluateRoundUtility(simulated, team);
+            if (simulated.RoundWinnerTeam.HasValue && simulated.RoundWinnerTeam.Value == team)
+            {
+                wins += 1;
+            }
+
+            samples += 1;
+        }
+
+        if (samples == 0)
+        {
+            return new OutcomeEstimate(double.NegativeInfinity, 0.0, 0);
+        }
+
+        return new OutcomeEstimate(total / samples, wins / (double)samples, samples);
     }
 
     private void RolloutToRoundEnd(
@@ -316,10 +465,7 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
                 continue;
             }
 
-            var actorSeat = ResolveActorSeat(state);
-            var actorPeerId = actorSeat == botSeat ? -60000 : -70000 - (int)actorSeat;
-            var legal = rulesEngine.EnumerateLegalCommands(state, actorSeat, actorPeerId);
-            if (legal.Count == 0)
+            if (!TryResolveRolloutActor(state, botSeat, rulesEngine, out var actorSeat, out var legal))
             {
                 return;
             }
@@ -350,6 +496,12 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
                 OmiPhase.Shuffle => legal.FirstOrDefault(command => command.Type == MatchCommandType.FinishShuffle) ?? legal[0],
                 OmiPhase.Cut => legal[legal.Count / 2],
                 OmiPhase.TrumpSelect => ChooseBestTrumpForSeat(state, legal, actorSeat),
+                OmiPhase.KapothiProposal => random.NextDouble() < 0.55
+                    ? legal.FirstOrDefault(command => command.Type == MatchCommandType.KapothiPropose) ?? legal[0]
+                    : legal.FirstOrDefault(command => command.Type == MatchCommandType.KapothiSkip) ?? legal[0],
+                OmiPhase.KapothiResponse => random.NextDouble() < 0.72
+                    ? legal.FirstOrDefault(command => command.Type == MatchCommandType.KapothiReject) ?? legal[0]
+                    : legal.FirstOrDefault(command => command.Type == MatchCommandType.KapothiAccept) ?? legal[0],
                 _ => legal[0]
             };
         }
@@ -469,8 +621,61 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
             OmiPhase.Shuffle => state.ShufflerSeat,
             OmiPhase.Cut => state.CutterSeat,
             OmiPhase.TrumpSelect => state.TrumpSelectorSeat,
+            OmiPhase.KapothiProposal => ResolveTeamAnchorSeat(state.KapothiEligibleTeam),
+            OmiPhase.KapothiResponse => ResolveTeamAnchorSeat(state.KapothiTargetTeam),
             _ => state.CurrentTurnSeat
         };
+    }
+
+    private static SeatPosition ResolveTeamAnchorSeat(int teamIndex)
+    {
+        return teamIndex switch
+        {
+            0 => SeatPosition.Bottom,
+            1 => SeatPosition.Right,
+            _ => SeatPosition.Bottom
+        };
+    }
+
+    private static bool TryResolveRolloutActor(
+        OmiMatchState state,
+        SeatPosition botSeat,
+        IGameRulesEngine rulesEngine,
+        out SeatPosition actorSeat,
+        out IReadOnlyList<MatchCommand> legalCommands)
+    {
+        actorSeat = ResolveActorSeat(state);
+        legalCommands = rulesEngine.EnumerateLegalCommands(state, actorSeat, BuildRolloutPeerId(actorSeat, botSeat));
+        if (legalCommands.Count > 0)
+        {
+            return true;
+        }
+
+        foreach (SeatPosition candidate in Enum.GetValues(typeof(SeatPosition)))
+        {
+            if (candidate == actorSeat)
+            {
+                continue;
+            }
+
+            var candidateLegal = rulesEngine.EnumerateLegalCommands(state, candidate, BuildRolloutPeerId(candidate, botSeat));
+            if (candidateLegal.Count == 0)
+            {
+                continue;
+            }
+
+            actorSeat = candidate;
+            legalCommands = candidateLegal;
+            return true;
+        }
+
+        legalCommands = Array.Empty<MatchCommand>();
+        return false;
+    }
+
+    private static int BuildRolloutPeerId(SeatPosition seat, SeatPosition botSeat)
+    {
+        return seat == botSeat ? -60000 : -70000 - (int)seat;
     }
 
     private static SeatPosition DetermineWinnerWithCandidate(
@@ -515,9 +720,26 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
 
         utility += (state.TeamCredits[botTeam] - state.TeamCredits[opponent]) * 3.0;
 
-        if (state.CurrentStake == 2 && trickDelta < 0)
+        if (trickDelta < 0)
         {
-            utility -= 8.0;
+            utility -= state.PendingDrawBonusCredits * 6.0;
+            if (state.KapothiAcceptedThisRound)
+            {
+                utility -= 12.0;
+            }
+        }
+        else if (trickDelta > 0)
+        {
+            utility += state.PendingDrawBonusCredits * 2.0;
+            if (state.KapothiAcceptedThisRound)
+            {
+                utility += 5.0;
+            }
+        }
+
+        if (state.TrumpTeamIndexThisRound == botTeam && trickDelta < 0)
+        {
+            utility -= 4.0;
         }
 
         return utility;

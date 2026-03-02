@@ -207,7 +207,10 @@ public partial class GameScreen : Control
 
         var teamCredits = ExtractPair(snapshot, "teamCredits", 10, 10);
         var teamTricks = ExtractPair(snapshot, "teamTricks", 0, 0);
-        _statusLabel.Text = BuildStatusText(phase, roundNumber, currentTurnSeat, trumpSuit, teamCredits, teamTricks);
+        var pendingDrawBonus = snapshot.TryGetValue("pendingDrawBonusCredits", out var drawBonusVariant)
+            ? drawBonusVariant.AsInt32()
+            : 0;
+        _statusLabel.Text = BuildStatusText(phase, roundNumber, currentTurnSeat, trumpSuit, teamCredits, teamTricks, pendingDrawBonus);
 
         TryStartPhaseAnimation(snapshot, phase, trumpSuit);
         if (_isDealAnimationRunning)
@@ -227,7 +230,7 @@ public partial class GameScreen : Control
         _lastTrumpSuit = trumpSuit;
     }
 
-    private string BuildStatusText(OmiPhase phase, int roundNumber, SeatPosition currentTurnSeat, int trumpSuit, int[] teamCredits, int[] teamTricks)
+    private string BuildStatusText(OmiPhase phase, int roundNumber, SeatPosition currentTurnSeat, int trumpSuit, int[] teamCredits, int[] teamTricks, int pendingDrawBonus)
     {
         var creditsText = $"{teamCredits[0]} - {teamCredits[1]}";
         var tricksText = $"{teamTricks[0]} - {teamTricks[1]}";
@@ -237,10 +240,12 @@ public partial class GameScreen : Control
             OmiPhase.FirstDeal => "Dealing first 4 cards...",
             OmiPhase.SecondDeal => "Trump selected. Dealing remaining cards...",
             OmiPhase.TrickResolveHold => "Resolving trick...",
+            OmiPhase.KapothiProposal => "Kapothi opportunity",
+            OmiPhase.KapothiResponse => "Kapothi proposed, waiting response",
             _ => $"Phase: {phase}"
         };
 
-        return $"Round {roundNumber} | {phaseText} | Turn: {BuildSeatTitle(currentTurnSeat)} | Trump: {trumpText} | Credits: {creditsText} | Tricks: {tricksText}";
+        return $"Round {roundNumber} | {phaseText} | Turn: {BuildSeatTitle(currentTurnSeat)} | Trump: {trumpText} | Credits: {creditsText} | Tricks: {tricksText} | Draw Bonus: +{pendingDrawBonus}";
     }
 
     private void TryStartPhaseAnimation(Godot.Collections.Dictionary snapshot, OmiPhase phase, int trumpSuit)
@@ -601,6 +606,37 @@ public partial class GameScreen : Control
             return;
         }
 
+        var localTeam = _localSeat.Value.TeamIndex();
+        var kapothiEligibleTeam = snapshot.TryGetValue("kapothiEligibleTeam", out var eligibleVariant)
+            ? eligibleVariant.AsInt32()
+            : -1;
+        var kapothiTargetTeam = snapshot.TryGetValue("kapothiTargetTeam", out var targetVariant)
+            ? targetVariant.AsInt32()
+            : -1;
+        var kapothiOffered = snapshot.TryGetValue("kapothiOfferedThisRound", out var offeredVariant) && offeredVariant.AsBool();
+
+        if (phase == OmiPhase.KapothiProposal && kapothiEligibleTeam == localTeam)
+        {
+            _actionPanel.Visible = true;
+            _actionLabel.Text = "Your team can propose Kapothi.";
+            _actionButton.Text = "Propose Kapothi";
+            _secondaryActionButton.Visible = true;
+            _secondaryActionButton.Disabled = false;
+            _secondaryActionButton.Text = "Skip Kapothi";
+            return;
+        }
+
+        if (phase == OmiPhase.KapothiResponse && kapothiOffered && kapothiTargetTeam == localTeam)
+        {
+            _actionPanel.Visible = true;
+            _actionLabel.Text = "Kapothi proposed. Choose your response.";
+            _actionButton.Text = "Accept Kapothi";
+            _secondaryActionButton.Visible = true;
+            _secondaryActionButton.Disabled = false;
+            _secondaryActionButton.Text = "Reject Kapothi";
+            return;
+        }
+
         _actionPanel.Visible = false;
     }
 
@@ -631,6 +667,18 @@ public partial class GameScreen : Control
         if (phase == OmiPhase.TrumpSelect)
         {
             NetworkRpc.Instance.SendSelectTrumpRequest((CardSuit)_trumpOption.GetSelectedId());
+            return;
+        }
+
+        if (phase == OmiPhase.KapothiProposal)
+        {
+            NetworkRpc.Instance.SendKapothiProposeRequest();
+            return;
+        }
+
+        if (phase == OmiPhase.KapothiResponse)
+        {
+            NetworkRpc.Instance.SendKapothiAcceptRequest();
         }
     }
 
@@ -649,6 +697,18 @@ public partial class GameScreen : Control
         if (phase == OmiPhase.Shuffle)
         {
             NetworkRpc.Instance.SendFinishShuffleRequest();
+            return;
+        }
+
+        if (phase == OmiPhase.KapothiProposal)
+        {
+            NetworkRpc.Instance.SendKapothiSkipRequest();
+            return;
+        }
+
+        if (phase == OmiPhase.KapothiResponse)
+        {
+            NetworkRpc.Instance.SendKapothiRejectRequest();
         }
     }
 

@@ -12,5 +12,9 @@ public enum MatchCommandType
     ForfeitTeam = 7,
     CompleteFirstDeal = 8,
     CompleteSecondDeal = 9,
-    ResolveCurrentTrick = 10
+    ResolveCurrentTrick = 10,
+    KapothiPropose = 11,
+    KapothiSkip = 12,
+    KapothiAccept = 13,
+    KapothiReject = 14
 }

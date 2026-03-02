@@ -136,6 +136,50 @@ public partial class NetworkRpc : Node
         RpcId(1, nameof(RequestPlayCard), cardId);
     }
 
+    public void SendKapothiProposeRequest()
+    {
+        if (Multiplayer.IsServer())
+        {
+            MatchCoordinator.Instance.ServerHandleKapothiPropose(Multiplayer.GetUniqueId(), out _);
+            return;
+        }
+
+        RpcId(1, nameof(RequestKapothiPropose));
+    }
+
+    public void SendKapothiSkipRequest()
+    {
+        if (Multiplayer.IsServer())
+        {
+            MatchCoordinator.Instance.ServerHandleKapothiSkip(Multiplayer.GetUniqueId(), out _);
+            return;
+        }
+
+        RpcId(1, nameof(RequestKapothiSkip));
+    }
+
+    public void SendKapothiAcceptRequest()
+    {
+        if (Multiplayer.IsServer())
+        {
+            MatchCoordinator.Instance.ServerHandleKapothiAccept(Multiplayer.GetUniqueId(), out _);
+            return;
+        }
+
+        RpcId(1, nameof(RequestKapothiAccept));
+    }
+
+    public void SendKapothiRejectRequest()
+    {
+        if (Multiplayer.IsServer())
+        {
+            MatchCoordinator.Instance.ServerHandleKapothiReject(Multiplayer.GetUniqueId(), out _);
+            return;
+        }
+
+        RpcId(1, nameof(RequestKapothiReject));
+    }
+
     public void SendLeaveRoomRequest()
     {
         if (Multiplayer.IsServer())
@@ -291,6 +335,70 @@ public partial class NetworkRpc : Node
 
         var sender = (int)Multiplayer.GetRemoteSenderId();
         var ok = MatchCoordinator.Instance.ServerHandlePlayCard(sender, cardId, out var error);
+        if (!ok)
+        {
+            RpcId(sender, nameof(PushServerMessage), error);
+        }
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    public void RequestKapothiPropose()
+    {
+        if (!Multiplayer.IsServer())
+        {
+            return;
+        }
+
+        var sender = (int)Multiplayer.GetRemoteSenderId();
+        var ok = MatchCoordinator.Instance.ServerHandleKapothiPropose(sender, out var error);
+        if (!ok)
+        {
+            RpcId(sender, nameof(PushServerMessage), error);
+        }
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    public void RequestKapothiSkip()
+    {
+        if (!Multiplayer.IsServer())
+        {
+            return;
+        }
+
+        var sender = (int)Multiplayer.GetRemoteSenderId();
+        var ok = MatchCoordinator.Instance.ServerHandleKapothiSkip(sender, out var error);
+        if (!ok)
+        {
+            RpcId(sender, nameof(PushServerMessage), error);
+        }
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    public void RequestKapothiAccept()
+    {
+        if (!Multiplayer.IsServer())
+        {
+            return;
+        }
+
+        var sender = (int)Multiplayer.GetRemoteSenderId();
+        var ok = MatchCoordinator.Instance.ServerHandleKapothiAccept(sender, out var error);
+        if (!ok)
+        {
+            RpcId(sender, nameof(PushServerMessage), error);
+        }
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    public void RequestKapothiReject()
+    {
+        if (!Multiplayer.IsServer())
+        {
+            return;
+        }
+
+        var sender = (int)Multiplayer.GetRemoteSenderId();
+        var ok = MatchCoordinator.Instance.ServerHandleKapothiReject(sender, out var error);
         if (!ok)
         {
             RpcId(sender, nameof(PushServerMessage), error);

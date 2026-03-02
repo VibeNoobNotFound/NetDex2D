@@ -21,6 +21,14 @@ public sealed class OmiMatchState
     public SeatPosition CurrentTurnSeat { get; set; } = SeatPosition.Bottom;
 
     public int CurrentStake { get; set; } = 1;
+    public int PendingDrawBonusCredits { get; set; }
+    public int ConsecutiveDraws { get; set; }
+    public int TrumpTeamIndexThisRound { get; set; } = -1;
+    public int KapothiEligibleTeam { get; set; } = -1;
+    public int KapothiTargetTeam { get; set; } = -1;
+    public bool KapothiOfferedThisRound { get; set; }
+    public bool KapothiAcceptedThisRound { get; set; }
+    public bool KapothiWindowConsumed { get; set; }
 
     public int[] TeamCredits { get; set; } = new[] { 10, 10 };
     public int[] TeamTricks { get; set; } = new[] { 0, 0 };
@@ -66,6 +74,12 @@ public sealed class OmiMatchState
         RoundWinnerTeam = null;
         TrumpSuit = null;
         PhaseDeadlineUnixSeconds = 0;
+        TrumpTeamIndexThisRound = -1;
+        KapothiEligibleTeam = -1;
+        KapothiTargetTeam = -1;
+        KapothiOfferedThisRound = false;
+        KapothiAcceptedThisRound = false;
+        KapothiWindowConsumed = false;
     }
 
     public OmiMatchState DeepClone()
@@ -83,6 +97,14 @@ public sealed class OmiMatchState
             TrumpSelectorSeat = TrumpSelectorSeat,
             CurrentTurnSeat = CurrentTurnSeat,
             CurrentStake = CurrentStake,
+            PendingDrawBonusCredits = PendingDrawBonusCredits,
+            ConsecutiveDraws = ConsecutiveDraws,
+            TrumpTeamIndexThisRound = TrumpTeamIndexThisRound,
+            KapothiEligibleTeam = KapothiEligibleTeam,
+            KapothiTargetTeam = KapothiTargetTeam,
+            KapothiOfferedThisRound = KapothiOfferedThisRound,
+            KapothiAcceptedThisRound = KapothiAcceptedThisRound,
+            KapothiWindowConsumed = KapothiWindowConsumed,
             TeamCredits = (int[])TeamCredits.Clone(),
             TeamTricks = (int[])TeamTricks.Clone(),
             Deck = Deck.ToList(),

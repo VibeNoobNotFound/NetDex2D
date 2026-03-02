@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using NetDex.Core.Commands;
 using NetDex.Core.Enums;
@@ -84,6 +85,12 @@ public partial class MatchCoordinator : Node
                 return;
             case OmiPhase.TrickResolveHold:
                 ApplyServerCommand(MatchCommand.ResolveCurrentTrick());
+                return;
+            case OmiPhase.KapothiProposal:
+                ApplyKapothiTimeoutAction(isProposalPhase: true);
+                return;
+            case OmiPhase.KapothiResponse:
+                ApplyKapothiTimeoutAction(isProposalPhase: false);
                 return;
         }
     }
@@ -205,6 +212,46 @@ public partial class MatchCoordinator : Node
         }
 
         return ApplyServerCommand(MatchCommand.PlayCard(seat, peerId, cardId), out error);
+    }
+
+    public bool ServerHandleKapothiPropose(int peerId, out string error)
+    {
+        if (!TryResolveSeat(peerId, out var seat, out error))
+        {
+            return false;
+        }
+
+        return ApplyServerCommand(MatchCommand.KapothiPropose(seat, peerId), out error);
+    }
+
+    public bool ServerHandleKapothiSkip(int peerId, out string error)
+    {
+        if (!TryResolveSeat(peerId, out var seat, out error))
+        {
+            return false;
+        }
+
+        return ApplyServerCommand(MatchCommand.KapothiSkip(seat, peerId), out error);
+    }
+
+    public bool ServerHandleKapothiAccept(int peerId, out string error)
+    {
+        if (!TryResolveSeat(peerId, out var seat, out error))
+        {
+            return false;
+        }
+
+        return ApplyServerCommand(MatchCommand.KapothiAccept(seat, peerId), out error);
+    }
+
+    public bool ServerHandleKapothiReject(int peerId, out string error)
+    {
+        if (!TryResolveSeat(peerId, out var seat, out error))
+        {
+            return false;
+        }
+
+        return ApplyServerCommand(MatchCommand.KapothiReject(seat, peerId), out error);
     }
 
     public bool ServerHandleAiCommand(MatchCommand command, out string error)
@@ -400,6 +447,67 @@ public partial class MatchCoordinator : Node
                     break;
             }
         }
+    }
+
+    private void ApplyKapothiTimeoutAction(bool isProposalPhase)
+    {
+        if (_state == null)
+        {
+            return;
+        }
+
+        var room = LobbyManager.Instance.CurrentRoom;
+        if (room == null)
+        {
+            return;
+        }
+
+        var actingTeam = isProposalPhase ? _state.KapothiEligibleTeam : _state.KapothiTargetTeam;
+        if (actingTeam is < 0 or > 1)
+        {
+            return;
+        }
+
+        if (!TryResolveAnySeatForTeam(room, actingTeam, out var seat, out var peerId))
+        {
+            return;
+        }
+
+        var command = isProposalPhase
+            ? MatchCommand.KapothiSkip(seat, peerId)
+            : MatchCommand.KapothiReject(seat, peerId);
+
+        ApplyServerCommand(command);
+    }
+
+    private static bool TryResolveAnySeatForTeam(RoomState room, int teamIndex, out SeatPosition seat, out int peerId)
+    {
+        seat = SeatPosition.Bottom;
+        peerId = 0;
+
+        foreach (SeatPosition candidateSeat in Enum.GetValues(typeof(SeatPosition)))
+        {
+            if (candidateSeat.TeamIndex() != teamIndex)
+            {
+                continue;
+            }
+
+            if (!room.SeatAssignments.TryGetValue(candidateSeat, out var assignedPeerId) || !assignedPeerId.HasValue)
+            {
+                continue;
+            }
+
+            if (!room.Participants.ContainsKey(assignedPeerId.Value))
+            {
+                continue;
+            }
+
+            seat = candidateSeat;
+            peerId = assignedPeerId.Value;
+            return true;
+        }
+
+        return false;
     }
 
     private bool TryResolveSeat(int peerId, out SeatPosition seat, out string error)

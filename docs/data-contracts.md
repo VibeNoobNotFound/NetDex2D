@@ -1,40 +1,8 @@
-# Data Contracts and RPC Reference
+# Data Contracts and RPC Map (Current)
 
-This file summarizes the important backend data contracts.
+This is the compact contract reference for multiplayer state and commands.
 
-## Enums
-
-### `GameType`
-
-- `Omi`
-
-### `ParticipantRole`
-
-- `Player`
-- `Spectator`
-
-### `ParticipantKind`
-
-- `Human`
-- `Bot`
-
-### `AiDifficulty`
-
-- `Easy`
-- `Normal`
-- `Strong`
-
-### `SeatPosition`
-
-- `Bottom`
-- `Right`
-- `Top`
-- `Left`
-
-Team mapping:
-
-- Team 0: Bottom + Top
-- Team 1: Right + Left
+## Enums used by runtime
 
 ### `OmiPhase`
 
@@ -46,15 +14,36 @@ Team mapping:
 - `SecondDeal`
 - `TrickPlay`
 - `RoundScore`
-- `MatchScore` (currently unused in flow)
+- `MatchScore` (legacy/unused in current flow)
 - `MatchEnd`
 - `PausedReconnect`
+- `TrickResolveHold`
+- `KapothiProposal`
+- `KapothiResponse`
 
-## Match snapshot (server -> client)
+### `MatchCommandType`
+
+- `StartRound`
+- `ShuffleAgain`
+- `FinishShuffle`
+- `CutDeck`
+- `SelectTrump`
+- `PlayCard`
+- `StartNextRound`
+- `ForfeitTeam`
+- `CompleteFirstDeal`
+- `CompleteSecondDeal`
+- `ResolveCurrentTrick`
+- `KapothiPropose`
+- `KapothiSkip`
+- `KapothiAccept`
+- `KapothiReject`
+
+## Match snapshot keys
 
 Serializer: `src/scripts/core/serialization/MatchSnapshotSerializer.cs`
 
-Important keys in snapshot dictionary:
+Important keys:
 
 - `phase`
 - `roundNumber`
@@ -66,9 +55,18 @@ Important keys in snapshot dictionary:
 - `currentTurnSeat`
 - `teamCredits`
 - `teamTricks`
-- `currentStake`
+- `currentStake` (compatibility field; scoring no longer depends on this)
+- `pendingDrawBonusCredits`
+- `consecutiveDraws`
+- `trumpTeamIndexThisRound`
+- `kapothiEligibleTeam`
+- `kapothiTargetTeam`
+- `kapothiOfferedThisRound`
+- `kapothiAcceptedThisRound`
+- `kapothiWindowConsumed`
 - `roundWinnerTeam`
 - `matchWinnerTeam`
+- `phaseDeadlineUnixSeconds`
 - `isPausedForReconnect`
 - `reconnectPeerId`
 - `reconnectDeadlineUnixSeconds`
@@ -78,11 +76,9 @@ Important keys in snapshot dictionary:
 - `viewerRole`
 - `viewerSeat`
 
-## Room snapshot (server -> client)
+## Room snapshot keys
 
-Built from `RoomState.ToSnapshotDictionary`.
-
-Important keys:
+From `RoomState.ToSnapshotDictionary`:
 
 - `roomName`
 - `hostName`
@@ -98,14 +94,20 @@ Important keys:
 - `spectatorCount`
 - `connectedPlayerCount`
 
-Participant entries now also include:
+Participant entries include:
 
+- `peerId`
+- `name`
+- `role`
+- `seat`
+- `isConnected`
+- `reconnectToken`
 - `kind`
 - `botDifficulty`
 
 ## Client -> server RPCs
 
-Defined in `src/scripts/network/NetworkRpc.cs`:
+`src/scripts/network/NetworkRpc.cs`
 
 - `RequestJoinRoom(playerName, requestedRole, reconnectToken)`
 - `RequestSeatChange(targetSeat, targetPeerId)`
@@ -116,16 +118,18 @@ Defined in `src/scripts/network/NetworkRpc.cs`:
 - `RequestFinishShuffle()`
 - `RequestSelectTrump(suit)`
 - `RequestPlayCard(cardId)`
+- `RequestKapothiPropose()`
+- `RequestKapothiSkip()`
+- `RequestKapothiAccept()`
+- `RequestKapothiReject()`
 - `RequestLeaveRoom()`
 
 ## Server -> client RPCs
 
 - `PushRoomSnapshot(snapshotJson)`
-- `PushSeatMap(seatSnapshotJson)`
+- `PushSeatMap(snapshotJson)`
 - `PushMatchSnapshot(snapshotJson)`
 - `PushMatchStarted(payloadJson)`
-- `PushPrivateHand(payloadJson)`
-- `PushSpectatorHands(payloadJson)`
 - `PushCardPlayed(payloadJson)`
 - `PushTrickResolved(payloadJson)`
 - `PushRoundResolved(payloadJson)`
@@ -134,17 +138,15 @@ Defined in `src/scripts/network/NetworkRpc.cs`:
 - `PushMatchEnded(payloadJson)`
 - `PushServerMessage(message)`
 
-## Match events produced by rules engine
+## Rules-engine events broadcast by coordinator
 
-Event names currently used:
+`MatchCoordinator.PushEventNotifications(...)` forwards selected `MatchEvent` types:
 
 - `round_started`
-- `deck_shuffled`
-- `shuffle_finished`
-- `deck_cut`
-- `trump_selected`
 - `card_played`
 - `trick_resolved`
 - `round_resolved`
 - `credits_updated`
 - `match_ended`
+
+Kapothi events are currently state-driven via snapshots (and may be added to broadcast list later if needed for richer client-only effects).

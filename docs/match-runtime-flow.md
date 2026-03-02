@@ -1,122 +1,93 @@
-# Match Runtime Flow (End to End)
+# Match Runtime Flow (With Kapothi + Timed Holds)
 
-This is the real runtime story from click -> backend -> UI.
+This page explains what actually happens at runtime from host start to round scoring.
 
-## 1) Host creates room
+## 1) Match start
 
-Screen path:
+- Host triggers `RequestStartMatch`.
+- Server validates lobby state and seats.
+- `MatchCoordinator.ServerStartMatch()` creates authoritative state and applies `StartRound`.
+- Room lifecycle switches to `InMatch`.
+- Server broadcasts room snapshot + match snapshot.
 
-- MainMenu -> HostScreen -> Create Host
+## 2) Round setup and timed deal phases
 
-Backend path:
+- `Shuffle`:
+- shuffler can `ShuffleAgain` repeatedly, then `FinishShuffle`.
+- `Cut`:
+- cutter sends `CutDeck`.
+- `FirstDeal`:
+- server deals 4 cards each and enters timed reveal hold.
+- deadline auto-advances using `CompleteFirstDeal`.
+- `TrumpSelect`:
+- trump selector sends `SelectTrump`.
+- `SecondDeal`:
+- server deals remaining 4 cards each and enters timed reveal hold.
+- deadline auto-advances using `CompleteSecondDeal`.
 
-- `NetworkManager.StartHostSession`
-- `LobbyManager.CreateHostedRoom`
-- `GameManager.LoadLobby`
+All clients render these as authoritative snapshots and animations.
 
-## 2) Clients discover and join
+## 3) Trick play + server lock
 
-Screen path:
+- `TrickPlay` accepts only legal card from current turn seat.
+- After 4th card, server moves to `TrickResolveHold` (readability delay).
+- On deadline, server applies `ResolveCurrentTrick`.
+- Winner seat leads next trick.
 
-- MainMenu -> JoinScreen
-- choose LAN room or type direct IP
+## 4) Kapothi window insertion
 
-Backend path:
+After trick resolution, if first `4-0` checkpoint is reached:
 
-- discovery list from `NetworkManager.GetDiscoveredRooms()`
-- join via `NetworkManager.JoinRoomByIp`
-- on connect, client sends `RequestJoinRoom`
-- host processes in `LobbyManager.ServerHandleJoinRequest`
-- host broadcasts room snapshot
+- phase becomes `KapothiProposal`,
+- eligible winning team can propose or skip.
 
-## 3) Host sets seats
+If proposed:
 
-Screen path:
+- phase becomes `KapothiResponse`,
+- losing team can accept or reject.
 
-- LobbyScreen seat selectors -> Apply Seats
+Timeout behavior:
 
-Backend path:
+- proposal timeout => auto-skip,
+- response timeout => auto-reject.
 
-- client/host sends `RequestSeatChange`
-- host validates host authority + lobby state
-- `RoomState.SetSeat` updates seating map
-- host broadcasts updated room snapshot
+If no Kapothi window is opened (or after it closes), flow returns to `TrickPlay`.
 
-## 4) Host starts match
+## 5) Round end scoring
 
-Screen path:
+After 8 tricks:
 
-- LobbyScreen -> Start Match
+- Draw:
+- first draw arms `+1` pending bonus.
+- second consecutive draw cancels pending bonus.
+- Decisive round:
+- base loss is `2` if trump team lost, else `1`.
+- add pending draw bonus (`0/1`).
+- add Kapothi accepted bonus (`+2`) if accepted this round.
+- loser credits decrease by total loss.
 
-Backend path:
+No immediate match end from `8-0` tricks. `8-0` is just decisive scoring under the same formula.
 
-- `RequestStartMatch`
-- `MatchCoordinator.ServerStartMatch`
-- `OmiRulesEngine.StartRound`
-- match lifecycle -> `InMatch`
-- host pushes snapshots and match-start event
+## 6) Match end and next round
 
-All clients auto-open GameScreen on match start event.
+- If any team credits reach `0`: phase -> `MatchEnd`, `match_ended` event broadcast.
+- Otherwise phase enters `RoundScore`; coordinator immediately starts next round via `StartNextRound`.
 
-## 5) Gameplay actions from GameScreen
+## 7) Reconnect pause precedence
 
-Action panel drives phase-specific commands:
+If seated player disconnects mid-match:
 
-- Shuffle phase:
-  - `SendShuffleAgainRequest`
-  - `SendFinishShuffleRequest`
-- Cut phase:
-  - `SendCutDeckRequest`
-- Trump select phase:
-  - `SendSelectTrumpRequest`
-- Trick play:
-  - click a card -> `SendPlayCardRequest`
+- server pauses state (`PausedReconnect`),
+- timed phase progression is suspended,
+- reconnect before deadline resumes original phase,
+- timeout forfeits disconnected team.
 
-## 6) Server authoritative loop
+## 8) Client rendering contract
 
-For each gameplay RPC:
+`GameScreen` is snapshot-driven only:
 
-1. `NetworkRpc.Request...` runs on host.
-2. Host calls `MatchCoordinator.ServerHandle...`.
-3. Coordinator resolves sender seat and applies `MatchCommand`.
-4. `OmiRulesEngine` validates and mutates state.
-5. Coordinator broadcasts:
-   - event RPCs (`PushCardPlayed`, `PushTrickResolved`, etc.)
-   - new snapshots via `LobbyManager.BroadcastMatchSnapshotToAll`
+- action panel enables only when local role/seat/phase permits.
+- Kapothi actions are shown only to the acting team.
+- spectators/other players are read-only.
 
-## 7) Client rendering model
-
-GameScreen does not trust local guesses.
-
-It redraws from snapshot:
-
-- hand counts and visible cards
-- turn seat
-- phase
-- trump
-- team credits and trick counts
-- current trick cards
-
-Local interaction is enabled only when:
-
-- local role is player
-- local seat equals current turn seat
-- phase allows action
-
-## 8) Reconnect and forfeit flow
-
-If seated player drops:
-
-- host marks offline
-- match pauses (`PausedReconnect`)
-- deadline set to now + 90s
-
-If same reconnect token returns in time:
-
-- seat and identity are restored
-- match resumes
-
-If deadline passes:
-
-- coordinator forfeits that team
-- match ends
+This keeps gameplay consistent on host, clients, and spectators.

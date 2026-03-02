@@ -84,4 +84,32 @@ public sealed class MatchCommand
     {
         Type = MatchCommandType.ResolveCurrentTrick
     };
+
+    public static MatchCommand KapothiPropose(SeatPosition actorSeat, int actorPeerId) => new()
+    {
+        Type = MatchCommandType.KapothiPropose,
+        ActorSeat = actorSeat,
+        ActorPeerId = actorPeerId
+    };
+
+    public static MatchCommand KapothiSkip(SeatPosition actorSeat, int actorPeerId) => new()
+    {
+        Type = MatchCommandType.KapothiSkip,
+        ActorSeat = actorSeat,
+        ActorPeerId = actorPeerId
+    };
+
+    public static MatchCommand KapothiAccept(SeatPosition actorSeat, int actorPeerId) => new()
+    {
+        Type = MatchCommandType.KapothiAccept,
+        ActorSeat = actorSeat,
+        ActorPeerId = actorPeerId
+    };
+
+    public static MatchCommand KapothiReject(SeatPosition actorSeat, int actorPeerId) => new()
+    {
+        Type = MatchCommandType.KapothiReject,
+        ActorSeat = actorSeat,
+        ActorPeerId = actorPeerId
+    };
 }

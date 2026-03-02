@@ -114,14 +114,7 @@ public partial class AiCoordinator : Node
 
         PruneShuffleCounters(state.RoundNumber);
 
-        if (!room.SeatAssignments.TryGetValue(state.CurrentTurnSeat, out var actorPeerId) || !actorPeerId.HasValue)
-        {
-            CancelActiveSearch();
-            _pendingDecision = null;
-            return;
-        }
-
-        if (!room.Participants.TryGetValue(actorPeerId.Value, out var actor) || !actor.IsBot)
+        if (!TryResolveBotActor(room, state, out var actorPeerId, out var actorSeat, out var difficulty))
         {
             CancelActiveSearch();
             _pendingDecision = null;
@@ -138,13 +131,12 @@ public partial class AiCoordinator : Node
             return;
         }
 
-        var perception = BuildPerception(state, actorPeerId.Value, actor.BotDifficulty ?? room.SelectedAiDifficulty, coordinator.StateVersion);
+        var perception = BuildPerception(state, actorSeat, actorPeerId, difficulty, coordinator.StateVersion);
         StartSearch(perception, coordinator.StateVersion);
     }
 
-    private BotPerceptionState BuildPerception(OmiMatchState state, int botPeerId, AiDifficulty difficulty, int stateVersion)
+    private BotPerceptionState BuildPerception(OmiMatchState state, SeatPosition botSeat, int botPeerId, AiDifficulty difficulty, int stateVersion)
     {
-        var botSeat = state.CurrentTurnSeat;
         var publicState = _rulesEngine.CloneState(state);
 
         var handCounts = new Dictionary<SeatPosition, int>();
@@ -298,11 +290,6 @@ public partial class AiCoordinator : Node
             return false;
         }
 
-        if (state.CurrentTurnSeat != decision.BotSeat)
-        {
-            return false;
-        }
-
         if (!room.SeatAssignments.TryGetValue(decision.BotSeat, out var seatPeerId) || seatPeerId != decision.BotPeerId)
         {
             return false;
@@ -313,7 +300,8 @@ public partial class AiCoordinator : Node
             return false;
         }
 
-        return true;
+        var legal = _rulesEngine.EnumerateLegalCommands(state, decision.BotSeat, decision.BotPeerId);
+        return IsCommandStillLegal(legal, decision.Command);
     }
 
     private void CancelActiveSearch()
@@ -410,5 +398,110 @@ public partial class AiCoordinator : Node
     private static string BuildShuffleKey(int roundNumber, SeatPosition seat)
     {
         return $"{roundNumber}:{(int)seat}";
+    }
+
+    private static bool IsCommandStillLegal(IReadOnlyList<MatchCommand> legalCommands, MatchCommand expected)
+    {
+        foreach (var legal in legalCommands)
+        {
+            if (legal.Type != expected.Type)
+            {
+                continue;
+            }
+
+            switch (expected.Type)
+            {
+                case MatchCommandType.PlayCard:
+                    if (!string.Equals(legal.CardId, expected.CardId, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    break;
+                case MatchCommandType.SelectTrump:
+                    if (legal.TrumpSuit != expected.TrumpSuit)
+                    {
+                        continue;
+                    }
+
+                    break;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryResolveBotActor(RoomState room, OmiMatchState state, out int botPeerId, out SeatPosition botSeat, out AiDifficulty difficulty)
+    {
+        botPeerId = 0;
+        botSeat = state.CurrentTurnSeat;
+        difficulty = room.SelectedAiDifficulty;
+
+        if (state.Phase == OmiPhase.KapothiProposal || state.Phase == OmiPhase.KapothiResponse)
+        {
+            var actingTeam = state.Phase == OmiPhase.KapothiProposal ? state.KapothiEligibleTeam : state.KapothiTargetTeam;
+            if (actingTeam is < 0 or > 1)
+            {
+                return false;
+            }
+
+            ParticipantInfo? selectedBot = null;
+            var selectedSeat = SeatPosition.Bottom;
+            foreach (SeatPosition seat in Enum.GetValues(typeof(SeatPosition)))
+            {
+                if (seat.TeamIndex() != actingTeam)
+                {
+                    continue;
+                }
+
+                if (!room.SeatAssignments.TryGetValue(seat, out var assignedPeerId) || !assignedPeerId.HasValue)
+                {
+                    continue;
+                }
+
+                if (!room.Participants.TryGetValue(assignedPeerId.Value, out var participant))
+                {
+                    continue;
+                }
+
+                if (!participant.IsBot && participant.IsConnected)
+                {
+                    return false;
+                }
+
+                if (participant.IsBot && selectedBot == null)
+                {
+                    selectedBot = participant;
+                    selectedSeat = seat;
+                }
+            }
+
+            if (selectedBot == null)
+            {
+                return false;
+            }
+
+            botPeerId = selectedBot.PeerId;
+            botSeat = selectedSeat;
+            difficulty = selectedBot.BotDifficulty ?? room.SelectedAiDifficulty;
+            return true;
+        }
+
+        if (!room.SeatAssignments.TryGetValue(state.CurrentTurnSeat, out var actorPeerId) || !actorPeerId.HasValue)
+        {
+            return false;
+        }
+
+        if (!room.Participants.TryGetValue(actorPeerId.Value, out var actor) || !actor.IsBot)
+        {
+            return false;
+        }
+
+        botPeerId = actorPeerId.Value;
+        botSeat = state.CurrentTurnSeat;
+        difficulty = actor.BotDifficulty ?? room.SelectedAiDifficulty;
+        return true;
     }
 }

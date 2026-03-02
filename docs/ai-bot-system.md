@@ -1,15 +1,15 @@
-# AI Bot System (Host Side)
+# AI Bot System (Host-Authoritative, Strict-Fair)
 
-This file explains how AI players work in NetDex.
+This document explains how bots are executed in the current multiplayer backend.
 
-## What AI bots are
+## Runtime ownership
 
-- Bots are fake players controlled by the host server.
-- Bots can fill empty seats when a match starts.
-- Bots follow the same rules as human players.
-- Bots do not receive hidden cards from opponents.
+- Bots run only on the host/server.
+- `AiCoordinator` decides when a bot must act.
+- `MatchCoordinator` still validates every AI command via `OmiRulesEngine`.
+- Clients never simulate authoritative bot state.
 
-## Where the AI code lives
+## Files
 
 - `src/scripts/ai/AiCoordinator.cs`
 - `src/scripts/ai/OmiBotPolicy.cs`
@@ -18,77 +18,79 @@ This file explains how AI players work in NetDex.
 - `src/scripts/ai/AiDifficulty.cs`
 - `src/scripts/ai/ParticipantKind.cs`
 
-## Lobby controls
+## Fairness model
 
-Host can set these options in lobby:
+Bots only use:
 
-- `Auto-fill empty seats with AI` (on/off)
-- `AI Difficulty` (`Easy`, `Normal`, `Strong`)
+- own hand,
+- public current trick cards,
+- completed trick history,
+- public counters (phase, trump, credits, tricks, hand counts).
 
-When host starts match:
+Bots do not read hidden opponent hands. Unknown cards are determinized from legal public constraints.
 
-- If auto-fill is on, server creates bots for empty seats.
-- If auto-fill is off, host still needs all 4 seats filled by humans.
+## Scheduling and safety
 
-## Bot fairness model
+`AiCoordinator`:
 
-Bots are strict-fair:
+- watches `MatchStateAdvanced` + room updates,
+- starts background search task for actionable phases,
+- cancels stale searches on state-version change,
+- applies short delay before dispatching final command.
 
-- Bot can see:
-  - its own hand
-  - cards already played (current trick + completed tricks)
-  - public state (turn, phase, trump, score, hand counts)
-- Bot cannot see:
-  - hidden cards in opponent hands
-  - future deck order
+AI is disabled for non-action phases (`FirstDeal`, `SecondDeal`, `TrickResolveHold`, reconnect pause, etc.).
 
-To reason about unknown cards, bot builds sampled possible worlds (determinization) from legal public info.
+## Kapothi team-action behavior
 
-## Bot decision flow
+Kapothi phases are team-owned, so coordinator resolves a bot actor differently:
 
-1. `AiCoordinator` checks whose turn it is.
-2. If that seat belongs to a bot, it creates a fair perception snapshot.
-3. It runs bot search on a background thread.
-4. It waits a short delay (human-like pacing).
-5. It submits one command to `MatchCoordinator`.
-6. `MatchCoordinator` still validates command using `OmiRulesEngine`.
+- `KapothiProposal`: acting team = `KapothiEligibleTeam`.
+- `KapothiResponse`: acting team = `KapothiTargetTeam`.
 
-If the state changed while bot was thinking, the old decision is dropped.
+Protection rule:
 
-## What actions bots can take
+- if the acting team has any connected human seat, AI does not auto-act for Kapothi.
+- AI only acts when that acting team is bot-controlled.
 
-Bots handle all Omi phases:
+## Policy behavior by phase
 
-- Shuffle:
-  - choose `ShuffleAgain` or `FinishShuffle`
-- Cut:
-  - choose cut index
-- Trump select:
-  - choose trump suit using hand + rollouts
-- Trick play:
-  - choose legal card using simulation + heuristics
+`OmiBotPolicy.ChooseCommand(...)` handles:
 
-## Difficulty levels
+- `Shuffle` (reshuffle vs finish)
+- `Cut`
+- `TrumpSelect` (rollout-evaluated)
+- `TrickPlay` (simulation + immediate heuristics)
+- `KapothiProposal` (propose vs skip by expected utility)
+- `KapothiResponse` (accept vs reject by comeback probability threshold + utility)
 
-- `Easy`: small budget, simpler choices
-- `Normal`: medium budget
-- `Strong`: larger search budget and stronger rollout policy
+## Difficulty differences
 
-Default difficulty is `Strong`.
+Difficulty adjusts simulation budgets and risk thresholds:
 
-## Data model changes
+- `Easy`: lower budgets, more permissive Kapothi acceptance.
+- `Normal`: medium budgets and thresholds.
+- `Strong`: largest budget and stricter Kapothi acceptance requirement.
 
-- `ParticipantInfo` now includes:
-  - `Kind` (`Human` or `Bot`)
-  - `BotDifficulty` (nullable)
-- `RoomState` now includes:
-  - `AiAutoFillEnabled`
-  - `SelectedAiDifficulty`
+## Rollout updates for new rules
 
-These fields are included in room snapshots so all clients can render bot info.
+Rollout now understands:
 
-## Limits in current version
+- timed transition commands (`CompleteFirstDeal`, `CompleteSecondDeal`, `ResolveCurrentTrick`),
+- Kapothi phases/commands during simulated progression.
 
-- Bot auto-fill happens at match start.
-- No mid-match human takeover of a bot seat.
-- No omniscient (cheating) bot mode.
+Utility no longer uses old `CurrentStake` logic. It now factors:
+
+- trick advantage,
+- round/match win outcomes,
+- credit delta,
+- pending draw-bonus risk,
+- Kapothi accepted risk/reward context.
+
+## Lobby integration
+
+Host controls:
+
+- `AiAutoFillEnabled`
+- `SelectedAiDifficulty`
+
+At match start, empty seats may be auto-filled by bots (depending on host setting). Mid-match human/bot replacement is still disabled.

@@ -1,40 +1,27 @@
-# Omi Rules Engine (Backend Truth)
+# Omi Rules Engine (Authoritative Rule Truth)
 
 Main file: `src/scripts/core/OmiRulesEngine.cs`
 
-This is the most important backend file for game correctness.
+This is the backend source of truth for legal moves, phase transitions, trick winners, credits, and match end.
 
-## Core idea
+## Core model
 
-The rules engine is a deterministic state machine:
+- Deterministic command/state engine.
+- Input: `MatchCommand`.
+- Validation + mutation happen only in the engine.
+- Output: `MatchCommandResult` with events for UI/network broadcast.
 
-- It receives a command (`MatchCommand`).
-- It validates the command against current phase/rules.
-- If valid, it updates `OmiMatchState`.
-- It returns events describing what happened.
+No UI timing, animation, or client trust logic is implemented here.
 
-No UI logic is inside this engine.
+## Card and trick baseline
 
-## Card model
+- Deck: 32 cards (`7..A`, 4 suits).
+- Must-follow-suit is enforced in `PlayCard`.
+- Trick winner:
+- highest trump if any trump was played.
+- otherwise highest lead-suit card.
 
-Deck:
-
-- 32 cards total
-- suits: Hearts, Diamonds, Clubs, Spades
-- ranks: 7 to Ace
-
-Strength currently equals rank numeric value (`7..14`).
-
-Files:
-
-- `src/scripts/core/CardModel.cs`
-- `src/scripts/core/DeckService.cs`
-
-## Match phases
-
-Enum: `OmiPhase`
-
-Actual phase order used:
+## Active phase flow
 
 1. `LobbySeating`
 2. `Shuffle`
@@ -43,80 +30,84 @@ Actual phase order used:
 5. `TrumpSelect`
 6. `SecondDeal`
 7. `TrickPlay`
-8. `RoundScore`
-9. `MatchEnd`
+8. `TrickResolveHold`
+9. `KapothiProposal` (optional window)
+10. `KapothiResponse` (optional window)
+11. `RoundScore`
+12. `MatchEnd`
 
-(`MatchScore` exists in enum but current flow goes through `RoundScore` and auto-next-round logic.)
+`MatchCoordinator` advances timed phases (`FirstDeal`, `SecondDeal`, `TrickResolveHold`, Kapothi windows) when deadlines expire.
 
-## Round setup
+## Kapothi house-rule implementation
 
-At start of round:
+Project-specific variant:
 
-- shuffler rotates each round (first round host seat)
-- cutter is left of shuffler (`Previous()`)
-- trump selector is right of shuffler (`Next()`)
-- deck is shuffled with random seed
-- phase becomes `Shuffle`
+- Kapothi window opens once per round, only at the first `4-0` checkpoint after trick resolution.
+- Eligibility requires:
+- `CompletedTricksCount == 4`
+- One team has 4 tricks and the other has 0.
+- Proposal phase:
+- eligible (winning) team can `KapothiPropose` or `KapothiSkip`.
+- Response phase:
+- target (losing) team can `KapothiAccept` or `KapothiReject`.
+- First valid response finalizes the window.
+- Timeout fallback (handled by coordinator):
+- proposal timeout => auto-skip
+- response timeout => auto-reject
 
-## Shuffle stage behavior
+If accepted, `KapothiAcceptedThisRound = true`, and final decisive loss gets `+2` credits.
 
-Current behavior:
+## New scoring model
 
-- only shuffler can reshuffle (`ShuffleAgain`)
-- shuffler can reshuffle unlimited times
-- only shuffler can finish shuffle (`FinishShuffle`)
-- finishing shuffle moves phase to `Cut` and gives turn to cutter
+No sweep auto-match-end by tricks. Match ends by credits reaching `0` (or forfeit path).
 
-## Deal and trump behavior
+On decisive rounds:
 
-- Cutter cuts the deck.
-- First deal: 4 cards each, round-robin starting from trump selector seat.
-- Trump selector chooses trump suit.
-- Second deal: remaining 4 cards each, same order.
-- Trick play starts, first turn = trump selector.
+- `baseLoss = 2` if loser is trump team.
+- `baseLoss = 1` otherwise.
+- `drawBonus = PendingDrawBonusCredits` (`0` or `1`).
+- `kapothiBonus = 2` if Kapothi accepted; otherwise `0`.
+- `totalLoss = baseLoss + drawBonus + kapothiBonus`.
 
-## Trick play validation
+On draws:
 
-For each card play:
+- first consecutive draw arms bonus: `PendingDrawBonusCredits = 1`, `ConsecutiveDraws = 1`.
+- second consecutive draw cancels bonus: `PendingDrawBonusCredits = 0`, `ConsecutiveDraws = 0`.
 
-- command must be in `TrickPlay` phase
-- actor seat must match current turn
-- card must exist in player's hand
-- if player has lead suit, player must follow lead suit
+On decisive resolution:
 
-Winner logic:
+- pending draw bonus and consecutive draw counter reset to zero.
 
-- if any trump played, highest trump wins
-- else highest lead suit wins
+## Round-tracked state added
 
-Winner seat leads next trick.
+`OmiMatchState` includes:
 
-## Round and match scoring
+- `PendingDrawBonusCredits`
+- `ConsecutiveDraws`
+- `TrumpTeamIndexThisRound`
+- `KapothiEligibleTeam`
+- `KapothiTargetTeam`
+- `KapothiOfferedThisRound`
+- `KapothiAcceptedThisRound`
+- `KapothiWindowConsumed`
 
-After 8 tricks:
+These fields are cloned and serialized in snapshots.
 
-- If 8-0 sweep:
-  - immediate match end
-  - sweep winner becomes match winner
-- If draw (4-4):
-  - no credit deduction
-  - next stake becomes `2`
-- If decisive winner:
-  - loser team loses `currentStake` credits
-  - stake resets to `1`
+## Events emitted for clients
 
-If loser credits reach `0`, match ends.
+Core events now include Kapothi and richer round payload:
 
-## Reconnect forfeit path
+- `kapothi_window_opened`
+- `kapothi_proposed`
+- `kapothi_skipped`
+- `kapothi_accepted`
+- `kapothi_rejected`
+- `round_resolved` (with `baseLoss`, `drawBonusApplied`, `kapothiBonusApplied`, `totalLoss`, etc.)
 
-If reconnect timeout expires, coordinator sends `ForfeitTeam(teamIndex)` command:
+## Reconnect/forfeit
 
-- forfeited team credits become `0`
-- other team immediately wins match
+Reconnect timeout forfeit remains unchanged:
 
-## Why this design is good
-
-- deterministic
-- easy to unit test
-- host can reject illegal client actions
-- future games can plug in via `IGameRulesEngine`
+- server submits `ForfeitTeam(teamIndex)`,
+- forfeited team credits forced to `0`,
+- phase becomes `MatchEnd`.

@@ -13,5 +13,7 @@ public enum OmiPhase
     MatchScore = 8,
     MatchEnd = 9,
     PausedReconnect = 10,
-    TrickResolveHold = 11
+    TrickResolveHold = 11,
+    KapothiProposal = 12,
+    KapothiResponse = 13
 }

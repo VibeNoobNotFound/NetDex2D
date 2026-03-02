@@ -39,6 +39,10 @@ public sealed class OmiRulesEngine : IGameRulesEngine
             MatchCommandType.CompleteSecondDeal => CompleteSecondDeal(state),
             MatchCommandType.PlayCard => PlayCard(state, command),
             MatchCommandType.ResolveCurrentTrick => ResolveCurrentTrick(state),
+            MatchCommandType.KapothiPropose => KapothiPropose(state, command),
+            MatchCommandType.KapothiSkip => KapothiSkip(state, command),
+            MatchCommandType.KapothiAccept => KapothiAccept(state, command),
+            MatchCommandType.KapothiReject => KapothiReject(state, command),
             MatchCommandType.ForfeitTeam => ForfeitTeam(state, command.TeamIndex),
             _ => MatchCommandResult.Fail("Unknown command")
         };
@@ -126,6 +130,24 @@ public sealed class OmiRulesEngine : IGameRulesEngine
                     }
                 }
 
+                return commands;
+            case OmiPhase.KapothiProposal:
+                if (state.KapothiEligibleTeam < 0 || actorSeat.TeamIndex() != state.KapothiEligibleTeam)
+                {
+                    return commands;
+                }
+
+                commands.Add(MatchCommand.KapothiPropose(actorSeat, actorPeerId));
+                commands.Add(MatchCommand.KapothiSkip(actorSeat, actorPeerId));
+                return commands;
+            case OmiPhase.KapothiResponse:
+                if (state.KapothiTargetTeam < 0 || !state.KapothiOfferedThisRound || actorSeat.TeamIndex() != state.KapothiTargetTeam)
+                {
+                    return commands;
+                }
+
+                commands.Add(MatchCommand.KapothiAccept(actorSeat, actorPeerId));
+                commands.Add(MatchCommand.KapothiReject(actorSeat, actorPeerId));
                 return commands;
             case OmiPhase.FirstDeal:
             case OmiPhase.SecondDeal:
@@ -284,6 +306,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         }
 
         state.TrumpSuit = command.TrumpSuit;
+        state.TrumpTeamIndexThisRound = state.TrumpSelectorSeat.TeamIndex();
         state.Phase = OmiPhase.SecondDeal;
         DealCardsRoundRobin(state, state.TrumpSelectorSeat, 4);
         state.PhaseDeadlineUnixSeconds = Time.GetUnixTimeFromSystem() + MatchTiming.SecondDealRevealSeconds;
@@ -415,12 +438,165 @@ public sealed class OmiRulesEngine : IGameRulesEngine
 
         if (state.CompletedTricksCount < 8)
         {
+            if (ShouldOpenKapothiWindow(state))
+            {
+                state.KapothiEligibleTeam = winnerTeam;
+                state.KapothiTargetTeam = 1 - winnerTeam;
+                state.KapothiWindowConsumed = true;
+                state.KapothiOfferedThisRound = false;
+                state.KapothiAcceptedThisRound = false;
+                state.Phase = OmiPhase.KapothiProposal;
+                state.PhaseDeadlineUnixSeconds = Time.GetUnixTimeFromSystem() + MatchTiming.KapothiProposalWindowSeconds;
+
+                result.Events.Add(new MatchEvent
+                {
+                    Type = "kapothi_window_opened",
+                    Payload = new Godot.Collections.Dictionary
+                    {
+                        ["eligibleTeam"] = state.KapothiEligibleTeam,
+                        ["targetTeam"] = state.KapothiTargetTeam,
+                        ["completedTricksCount"] = state.CompletedTricksCount
+                    }
+                });
+                return result;
+            }
+
             state.Phase = OmiPhase.TrickPlay;
             return result;
         }
 
         FinalizeRound(state, result);
         return result;
+    }
+
+    private static MatchCommandResult KapothiPropose(OmiMatchState state, MatchCommand command)
+    {
+        if (state.Phase != OmiPhase.KapothiProposal)
+        {
+            return MatchCommandResult.Fail($"Cannot propose Kapothi during {state.Phase}");
+        }
+
+        if (!command.ActorSeat.HasValue)
+        {
+            return MatchCommandResult.Fail("Actor seat is required");
+        }
+
+        if (state.KapothiEligibleTeam < 0 || command.ActorSeat.Value.TeamIndex() != state.KapothiEligibleTeam)
+        {
+            return MatchCommandResult.Fail("Only the eligible winning team can propose Kapothi");
+        }
+
+        state.KapothiOfferedThisRound = true;
+        state.Phase = OmiPhase.KapothiResponse;
+        state.PhaseDeadlineUnixSeconds = Time.GetUnixTimeFromSystem() + MatchTiming.KapothiResponseWindowSeconds;
+
+        return MatchCommandResult.Ok(new MatchEvent
+        {
+            Type = "kapothi_proposed",
+            Payload = new Godot.Collections.Dictionary
+            {
+                ["eligibleTeam"] = state.KapothiEligibleTeam,
+                ["targetTeam"] = state.KapothiTargetTeam,
+                ["seat"] = command.ActorSeat.Value.ToString()
+            }
+        });
+    }
+
+    private static MatchCommandResult KapothiSkip(OmiMatchState state, MatchCommand command)
+    {
+        if (state.Phase != OmiPhase.KapothiProposal)
+        {
+            return MatchCommandResult.Fail($"Cannot skip Kapothi during {state.Phase}");
+        }
+
+        if (!command.ActorSeat.HasValue)
+        {
+            return MatchCommandResult.Fail("Actor seat is required");
+        }
+
+        if (state.KapothiEligibleTeam < 0 || command.ActorSeat.Value.TeamIndex() != state.KapothiEligibleTeam)
+        {
+            return MatchCommandResult.Fail("Only the eligible winning team can skip Kapothi");
+        }
+
+        var eligibleTeam = state.KapothiEligibleTeam;
+        var targetTeam = state.KapothiTargetTeam;
+        CloseKapothiWindow(state);
+
+        return MatchCommandResult.Ok(new MatchEvent
+        {
+            Type = "kapothi_skipped",
+            Payload = new Godot.Collections.Dictionary
+            {
+                ["eligibleTeam"] = eligibleTeam,
+                ["targetTeam"] = targetTeam,
+                ["seat"] = command.ActorSeat.Value.ToString()
+            }
+        });
+    }
+
+    private static MatchCommandResult KapothiAccept(OmiMatchState state, MatchCommand command)
+    {
+        if (state.Phase != OmiPhase.KapothiResponse)
+        {
+            return MatchCommandResult.Fail($"Cannot accept Kapothi during {state.Phase}");
+        }
+
+        if (!command.ActorSeat.HasValue)
+        {
+            return MatchCommandResult.Fail("Actor seat is required");
+        }
+
+        if (state.KapothiTargetTeam < 0 || command.ActorSeat.Value.TeamIndex() != state.KapothiTargetTeam)
+        {
+            return MatchCommandResult.Fail("Only the target team can accept Kapothi");
+        }
+
+        var targetTeam = state.KapothiTargetTeam;
+        state.KapothiAcceptedThisRound = true;
+        CloseKapothiWindow(state);
+
+        return MatchCommandResult.Ok(new MatchEvent
+        {
+            Type = "kapothi_accepted",
+            Payload = new Godot.Collections.Dictionary
+            {
+                ["targetTeam"] = targetTeam,
+                ["seat"] = command.ActorSeat.Value.ToString()
+            }
+        });
+    }
+
+    private static MatchCommandResult KapothiReject(OmiMatchState state, MatchCommand command)
+    {
+        if (state.Phase != OmiPhase.KapothiResponse)
+        {
+            return MatchCommandResult.Fail($"Cannot reject Kapothi during {state.Phase}");
+        }
+
+        if (!command.ActorSeat.HasValue)
+        {
+            return MatchCommandResult.Fail("Actor seat is required");
+        }
+
+        if (state.KapothiTargetTeam < 0 || command.ActorSeat.Value.TeamIndex() != state.KapothiTargetTeam)
+        {
+            return MatchCommandResult.Fail("Only the target team can reject Kapothi");
+        }
+
+        var targetTeam = state.KapothiTargetTeam;
+        state.KapothiAcceptedThisRound = false;
+        CloseKapothiWindow(state);
+
+        return MatchCommandResult.Ok(new MatchEvent
+        {
+            Type = "kapothi_rejected",
+            Payload = new Godot.Collections.Dictionary
+            {
+                ["targetTeam"] = targetTeam,
+                ["seat"] = command.ActorSeat.Value.ToString()
+            }
+        });
     }
 
     private static MatchCommandResult ForfeitTeam(OmiMatchState state, int teamIndex)
@@ -453,42 +629,21 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         var team0 = state.TeamTricks[0];
         var team1 = state.TeamTricks[1];
 
-        var isSweep = team0 == 8 || team1 == 8;
-        if (isSweep)
-        {
-            state.RoundWinnerTeam = team0 == 8 ? 0 : 1;
-            state.MatchWinnerTeam = state.RoundWinnerTeam;
-            state.Phase = OmiPhase.MatchEnd;
-            state.PhaseDeadlineUnixSeconds = 0;
-
-            result.Events.Add(new MatchEvent
-            {
-                Type = "round_resolved",
-                Payload = new Godot.Collections.Dictionary
-                {
-                    ["winnerTeam"] = state.RoundWinnerTeam.Value,
-                    ["isDraw"] = false,
-                    ["isSweep"] = true,
-                    ["teamTricks"] = new Godot.Collections.Array { team0, team1 }
-                }
-            });
-
-            result.Events.Add(new MatchEvent
-            {
-                Type = "match_ended",
-                Payload = new Godot.Collections.Dictionary
-                {
-                    ["winnerTeam"] = state.MatchWinnerTeam.Value,
-                    ["reason"] = "sweep"
-                }
-            });
-            return;
-        }
-
         if (team0 == team1)
         {
             state.RoundWinnerTeam = null;
-            state.CurrentStake = 2;
+            if (state.ConsecutiveDraws == 0)
+            {
+                state.PendingDrawBonusCredits = 1;
+                state.ConsecutiveDraws = 1;
+            }
+            else
+            {
+                state.PendingDrawBonusCredits = 0;
+                state.ConsecutiveDraws = 0;
+            }
+
+            state.CurrentStake = 1;
             state.Phase = OmiPhase.RoundScore;
             state.PhaseDeadlineUnixSeconds = 0;
 
@@ -500,8 +655,10 @@ public sealed class OmiRulesEngine : IGameRulesEngine
                     ["winnerTeam"] = -1,
                     ["isDraw"] = true,
                     ["isSweep"] = false,
-                    ["nextStake"] = state.CurrentStake,
-                    ["teamTricks"] = new Godot.Collections.Array { team0, team1 }
+                    ["teamTricks"] = new Godot.Collections.Array { team0, team1 },
+                    ["trumpTeam"] = state.TrumpTeamIndexThisRound,
+                    ["pendingDrawBonusNext"] = state.PendingDrawBonusCredits,
+                    ["consecutiveDraws"] = state.ConsecutiveDraws
                 }
             });
             return;
@@ -509,9 +666,17 @@ public sealed class OmiRulesEngine : IGameRulesEngine
 
         var winnerTeam = team0 > team1 ? 0 : 1;
         var loserTeam = 1 - winnerTeam;
+        var isSweep = team0 == 8 || team1 == 8;
+        var baseLoss = loserTeam == state.TrumpTeamIndexThisRound ? 2 : 1;
+        var drawBonus = state.PendingDrawBonusCredits;
+        var kapothiBonus = state.KapothiAcceptedThisRound ? 2 : 0;
+        var totalLoss = baseLoss + drawBonus + kapothiBonus;
+
         state.RoundWinnerTeam = winnerTeam;
 
-        state.TeamCredits[loserTeam] = Math.Max(0, state.TeamCredits[loserTeam] - state.CurrentStake);
+        state.TeamCredits[loserTeam] = Math.Max(0, state.TeamCredits[loserTeam] - totalLoss);
+        state.PendingDrawBonusCredits = 0;
+        state.ConsecutiveDraws = 0;
         state.CurrentStake = 1;
 
         result.Events.Add(new MatchEvent
@@ -521,8 +686,16 @@ public sealed class OmiRulesEngine : IGameRulesEngine
             {
                 ["winnerTeam"] = winnerTeam,
                 ["isDraw"] = false,
-                ["isSweep"] = false,
-                ["teamTricks"] = new Godot.Collections.Array { team0, team1 }
+                ["isSweep"] = isSweep,
+                ["teamTricks"] = new Godot.Collections.Array { team0, team1 },
+                ["loserTeam"] = loserTeam,
+                ["trumpTeam"] = state.TrumpTeamIndexThisRound,
+                ["baseLoss"] = baseLoss,
+                ["drawBonusApplied"] = drawBonus,
+                ["kapothiBonusApplied"] = kapothiBonus,
+                ["totalLoss"] = totalLoss,
+                ["pendingDrawBonusNext"] = state.PendingDrawBonusCredits,
+                ["consecutiveDraws"] = state.ConsecutiveDraws
             }
         });
 
@@ -531,7 +704,9 @@ public sealed class OmiRulesEngine : IGameRulesEngine
             Type = "credits_updated",
             Payload = new Godot.Collections.Dictionary
             {
-                ["teamCredits"] = new Godot.Collections.Array { state.TeamCredits[0], state.TeamCredits[1] }
+                ["teamCredits"] = new Godot.Collections.Array { state.TeamCredits[0], state.TeamCredits[1] },
+                ["loserTeam"] = loserTeam,
+                ["totalLoss"] = totalLoss
             }
         });
 
@@ -555,6 +730,25 @@ public sealed class OmiRulesEngine : IGameRulesEngine
 
         state.Phase = OmiPhase.RoundScore;
         state.PhaseDeadlineUnixSeconds = 0;
+    }
+
+    private static bool ShouldOpenKapothiWindow(OmiMatchState state)
+    {
+        if (state.KapothiWindowConsumed || state.CompletedTricksCount != 4)
+        {
+            return false;
+        }
+
+        return (state.TeamTricks[0] == 4 && state.TeamTricks[1] == 0) ||
+               (state.TeamTricks[1] == 4 && state.TeamTricks[0] == 0);
+    }
+
+    private static void CloseKapothiWindow(OmiMatchState state)
+    {
+        state.Phase = OmiPhase.TrickPlay;
+        state.PhaseDeadlineUnixSeconds = 0;
+        state.KapothiEligibleTeam = -1;
+        state.KapothiTargetTeam = -1;
     }
 
     private static bool IsCardPlayableByRule(OmiMatchState state, IReadOnlyList<CardModel> hand, CardModel candidate)
