@@ -1,36 +1,35 @@
-# NetDex Docs (Beginner Friendly)
+# NetDex Documentation Portal
 
-The `docs/` folder explains how the game works, especially the backend (multiplayer + rules engine).
+This folder documents NetDex end-to-end: architecture, flow, scenes, scripts, networking, AI, and updater behavior.
 
-The project code is in `src/`.
+## Recommended reading order
 
-If you are new, read in this order:
+1. `../README.md` (repo overview)
+2. `backend-overview.md`
+3. `match-runtime-flow.md`
+4. `reference/autoloads.md`
+5. `reference/rpc-map.md`
+6. `reference/signals-and-events.md`
+7. `flows/*.md`
+8. `scenes/*.md` and `scripts/**/*.md`
 
-1. `backend-overview.md`
-2. `code-map.md`
-3. `network-discovery.md`
-4. `lobby-and-room-management.md`
-5. `omi-rules-engine.md`
-6. `match-runtime-flow.md`
-7. `data-contracts.md`
-8. `troubleshooting.md`
-9. `android-networking.md`
-10. `ai-bot-system.md`
+## Existing deep-dive docs
 
-## Quick project map
+- `ai-bot-system.md`
+- `android-networking.md`
+- `backend-overview.md`
+- `code-map.md`
+- `data-contracts.md`
+- `lobby-and-room-management.md`
+- `match-runtime-flow.md`
+- `network-discovery.md`
+- `omi-rules-engine.md`
+- `troubleshooting.md`
 
-- Main project file: `src/project.godot`
-- Main scene: `src/main.tscn`
-- Core game rules: `src/scripts/core/`
-- Lobby/session backend: `src/scripts/lobby/`
-- Networking backend: `src/scripts/network/`
-- Match orchestration: `src/scripts/game/MatchCoordinator.cs`
-- UI scripts: `src/scripts/ui/` and `src/scripts/game/GameScreen.cs`
+## Generated reference sets
 
-## Build and open
-
-- Build:
-  - `cd src`
-  - `dotnet build NetDex.sln`
-- Open in Godot:
-  - Open `src/project.godot`
+- Scene docs: `scenes/`
+- Script docs: `scripts/` (one page per C# file)
+- Lifecycle docs: `flows/`
+- Signal/RPC/autoload maps: `reference/`
+- Coverage manifest: `_manifest.md`
