@@ -17,8 +17,8 @@ config/features=PackedStringArray("4.6", "C#", "GL Compatibility")
 config/icon="res://icon.svg"
 config/developer_name="NoobNotFound"
 config/copyright_notice="(c) VibeNoobNotFound"
-config/repository_url="https://github.com/VibeNoobNotFound/net-dex"
-config/releases_url="https://github.com/VibeNoobNotFound/net-dex/releases"
+config/repository_url="https://github.com/VibeNoobNotFound/NetDex2D"
+config/releases_url="https://github.com/VibeNoobNotFound/NetDex2D/releases"
 
 [autoload]
 

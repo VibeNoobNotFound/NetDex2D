@@ -4,3 +4,5 @@
 .DS_Store
 .idea/
 src/NetDex.sln.DotSettings.user
+/Publish
+/docs/releases

@@ -16,16 +16,16 @@ public partial class UpdateManager : Node
     }
 
     private const string UpdaterConfigPath = "user://updater.cfg";
-    private const string DefaultRepositoryUrl = "https://github.com/NoobNotFound/net-dex";
-    private const string DefaultReleasesUrl = "https://github.com/NoobNotFound/net-dex/releases";
-    private const string DefaultRepoOwner = "NoobNotFound";
-    private const string DefaultRepoName = "net-dex";
+    private const string DefaultRepositoryUrl = "https://github.com/VibeNoobNotFound/NetDex2D";
+    private const string DefaultReleasesUrl = "https://github.com/VibeNoobNotFound/NetDex2D/releases";
+    private const string DefaultRepoOwner = "VibeNoobNotFound";
+    private const string DefaultRepoName = "NetDex2D";
 
     private const string MacAssetName = "netdex-macos-universal.zip";
     private const string WindowsX86_64AssetName = "netdex-windows-x86_64.zip";
     private const string WindowsX64LegacyAssetName = "netdex-windows-x64.zip";
     private const string WindowsArm64AssetName = "netdex-windows-arm64.zip";
-    private const string LinuxAssetName = "netdex-linux-x64.zip";
+    private const string LinuxAssetName = "netdex-linux-x86_64.zip";
     private const string AndroidAssetName = "netdex-android-arm64.apk";
 
     private const double AutoCheckIntervalSeconds = 6 * 60 * 60;
@@ -321,7 +321,7 @@ public partial class UpdateManager : Node
         return _runtimeArchitecture switch
         {
             RuntimeArchitecture.Arm64 => FindAssetByNames(release, WindowsArm64AssetName),
-            RuntimeArchitecture.X86_64 => FindAssetByNames(release, WindowsX86_64AssetName, WindowsX64LegacyAssetName),
+            RuntimeArchitecture.X86_64 => FindAssetByNames(release, WindowsX86_64AssetName),
             _ => FindAssetByNames(release, WindowsX86_64AssetName, WindowsX64LegacyAssetName, WindowsArm64AssetName)
         };
     }
