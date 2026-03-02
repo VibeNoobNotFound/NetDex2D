@@ -61,7 +61,7 @@ Protection rule:
 - `TrumpSelect` (rollout-evaluated)
 - `TrickPlay` (simulation + immediate heuristics)
 - `KapothiProposal` (propose vs skip by expected utility)
-- `KapothiResponse` (accept vs reject by comeback probability threshold + utility)
+- `KapothiResponse` (accept vs reject by scoring-favorable probability threshold + utility)
 
 ## Difficulty differences
 
@@ -81,10 +81,10 @@ Rollout now understands:
 Utility no longer uses old `CurrentStake` logic. It now factors:
 
 - trick advantage,
-- round/match win outcomes,
+- scoring winner / credit loser outcome,
 - credit delta,
 - pending draw-bonus risk,
-- Kapothi accepted risk/reward context.
+- Kapothi accepted contract risk/reward context (including caller-failure even with trick lead).
 
 ## Lobby integration
 

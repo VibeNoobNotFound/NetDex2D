@@ -53,6 +53,7 @@ public static class MatchSnapshotSerializer
             ["trumpTeamIndexThisRound"] = state.TrumpTeamIndexThisRound,
             ["kapothiEligibleTeam"] = state.KapothiEligibleTeam,
             ["kapothiTargetTeam"] = state.KapothiTargetTeam,
+            ["kapothiCallingTeamThisRound"] = state.KapothiCallingTeamThisRound,
             ["kapothiOfferedThisRound"] = state.KapothiOfferedThisRound,
             ["kapothiAcceptedThisRound"] = state.KapothiAcceptedThisRound,
             ["kapothiWindowConsumed"] = state.KapothiWindowConsumed,

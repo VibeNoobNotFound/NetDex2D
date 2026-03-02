@@ -445,6 +445,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
                 state.KapothiWindowConsumed = true;
                 state.KapothiOfferedThisRound = false;
                 state.KapothiAcceptedThisRound = false;
+                state.KapothiCallingTeamThisRound = -1;
                 state.Phase = OmiPhase.KapothiProposal;
                 state.PhaseDeadlineUnixSeconds = Time.GetUnixTimeFromSystem() + MatchTiming.KapothiProposalWindowSeconds;
 
@@ -487,6 +488,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         }
 
         state.KapothiOfferedThisRound = true;
+        state.KapothiCallingTeamThisRound = state.KapothiEligibleTeam;
         state.Phase = OmiPhase.KapothiResponse;
         state.PhaseDeadlineUnixSeconds = Time.GetUnixTimeFromSystem() + MatchTiming.KapothiResponseWindowSeconds;
 
@@ -521,6 +523,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
 
         var eligibleTeam = state.KapothiEligibleTeam;
         var targetTeam = state.KapothiTargetTeam;
+        state.KapothiCallingTeamThisRound = -1;
         CloseKapothiWindow(state);
 
         return MatchCommandResult.Ok(new MatchEvent
@@ -553,6 +556,11 @@ public sealed class OmiRulesEngine : IGameRulesEngine
         }
 
         var targetTeam = state.KapothiTargetTeam;
+        if (state.KapothiCallingTeamThisRound is < 0 or > 1)
+        {
+            state.KapothiCallingTeamThisRound = 1 - targetTeam;
+        }
+
         state.KapothiAcceptedThisRound = true;
         CloseKapothiWindow(state);
 
@@ -586,6 +594,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
 
         var targetTeam = state.KapothiTargetTeam;
         state.KapothiAcceptedThisRound = false;
+        state.KapothiCallingTeamThisRound = -1;
         CloseKapothiWindow(state);
 
         return MatchCommandResult.Ok(new MatchEvent
@@ -628,21 +637,94 @@ public sealed class OmiRulesEngine : IGameRulesEngine
     {
         var team0 = state.TeamTricks[0];
         var team1 = state.TeamTricks[1];
+        var isDraw = team0 == team1;
+        var winnerTeam = isDraw ? -1 : team0 > team1 ? 0 : 1;
+        var loserTeam = winnerTeam < 0 ? -1 : 1 - winnerTeam;
+        var isSweep = team0 == 8 || team1 == 8;
 
-        if (team0 == team1)
+        if (TryResolveKapothiCreditLoserTeam(state, out var creditLoserTeam, out var kapothiSucceeded))
         {
-            state.RoundWinnerTeam = null;
-            if (state.ConsecutiveDraws == 0)
+            var baseLoss = creditLoserTeam == state.TrumpTeamIndexThisRound ? 2 : 1;
+            var drawBonus = state.PendingDrawBonusCredits;
+            const int kapothiBonus = 2;
+            var totalLoss = baseLoss + drawBonus + kapothiBonus;
+
+            state.RoundWinnerTeam = winnerTeam < 0 ? null : winnerTeam;
+            state.TeamCredits[creditLoserTeam] = Math.Max(0, state.TeamCredits[creditLoserTeam] - totalLoss);
+            if (isDraw)
             {
-                state.PendingDrawBonusCredits = 1;
-                state.ConsecutiveDraws = 1;
+                AdvanceDrawStreak(state);
             }
             else
             {
-                state.PendingDrawBonusCredits = 0;
-                state.ConsecutiveDraws = 0;
+                ResetDrawStreak(state);
             }
 
+            state.CurrentStake = 1;
+            var scoringWinnerTeam = 1 - creditLoserTeam;
+
+            result.Events.Add(new MatchEvent
+            {
+                Type = "round_resolved",
+                Payload = new Godot.Collections.Dictionary
+                {
+                    ["winnerTeam"] = winnerTeam,
+                    ["isDraw"] = isDraw,
+                    ["isSweep"] = isSweep,
+                    ["teamTricks"] = new Godot.Collections.Array { team0, team1 },
+                    ["loserTeam"] = loserTeam,
+                    ["trumpTeam"] = state.TrumpTeamIndexThisRound,
+                    ["baseLoss"] = baseLoss,
+                    ["drawBonusApplied"] = drawBonus,
+                    ["kapothiBonusApplied"] = kapothiBonus,
+                    ["totalLoss"] = totalLoss,
+                    ["pendingDrawBonusNext"] = state.PendingDrawBonusCredits,
+                    ["consecutiveDraws"] = state.ConsecutiveDraws,
+                    ["kapothiAccepted"] = true,
+                    ["kapothiCallingTeam"] = state.KapothiCallingTeamThisRound,
+                    ["kapothiSucceeded"] = kapothiSucceeded,
+                    ["creditLoserTeam"] = creditLoserTeam
+                }
+            });
+
+            result.Events.Add(new MatchEvent
+            {
+                Type = "credits_updated",
+                Payload = new Godot.Collections.Dictionary
+                {
+                    ["teamCredits"] = new Godot.Collections.Array { state.TeamCredits[0], state.TeamCredits[1] },
+                    ["loserTeam"] = creditLoserTeam,
+                    ["totalLoss"] = totalLoss
+                }
+            });
+
+            if (state.TeamCredits[creditLoserTeam] <= 0)
+            {
+                state.MatchWinnerTeam = scoringWinnerTeam;
+                state.Phase = OmiPhase.MatchEnd;
+                state.PhaseDeadlineUnixSeconds = 0;
+
+                result.Events.Add(new MatchEvent
+                {
+                    Type = "match_ended",
+                    Payload = new Godot.Collections.Dictionary
+                    {
+                        ["winnerTeam"] = scoringWinnerTeam,
+                        ["reason"] = "credits"
+                    }
+                });
+                return;
+            }
+
+            state.Phase = OmiPhase.RoundScore;
+            state.PhaseDeadlineUnixSeconds = 0;
+            return;
+        }
+
+        if (isDraw)
+        {
+            state.RoundWinnerTeam = null;
+            AdvanceDrawStreak(state);
             state.CurrentStake = 1;
             state.Phase = OmiPhase.RoundScore;
             state.PhaseDeadlineUnixSeconds = 0;
@@ -658,25 +740,24 @@ public sealed class OmiRulesEngine : IGameRulesEngine
                     ["teamTricks"] = new Godot.Collections.Array { team0, team1 },
                     ["trumpTeam"] = state.TrumpTeamIndexThisRound,
                     ["pendingDrawBonusNext"] = state.PendingDrawBonusCredits,
-                    ["consecutiveDraws"] = state.ConsecutiveDraws
+                    ["consecutiveDraws"] = state.ConsecutiveDraws,
+                    ["kapothiAccepted"] = false,
+                    ["kapothiCallingTeam"] = state.KapothiCallingTeamThisRound,
+                    ["kapothiSucceeded"] = false,
+                    ["creditLoserTeam"] = -1
                 }
             });
             return;
         }
 
-        var winnerTeam = team0 > team1 ? 0 : 1;
-        var loserTeam = 1 - winnerTeam;
-        var isSweep = team0 == 8 || team1 == 8;
-        var baseLoss = loserTeam == state.TrumpTeamIndexThisRound ? 2 : 1;
-        var drawBonus = state.PendingDrawBonusCredits;
-        var kapothiBonus = state.KapothiAcceptedThisRound ? 2 : 0;
-        var totalLoss = baseLoss + drawBonus + kapothiBonus;
+        var baseLossDecisive = loserTeam == state.TrumpTeamIndexThisRound ? 2 : 1;
+        var drawBonusDecisive = state.PendingDrawBonusCredits;
+        const int kapothiBonusDecisive = 0;
+        var totalLossDecisive = baseLossDecisive + drawBonusDecisive + kapothiBonusDecisive;
 
         state.RoundWinnerTeam = winnerTeam;
-
-        state.TeamCredits[loserTeam] = Math.Max(0, state.TeamCredits[loserTeam] - totalLoss);
-        state.PendingDrawBonusCredits = 0;
-        state.ConsecutiveDraws = 0;
+        state.TeamCredits[loserTeam] = Math.Max(0, state.TeamCredits[loserTeam] - totalLossDecisive);
+        ResetDrawStreak(state);
         state.CurrentStake = 1;
 
         result.Events.Add(new MatchEvent
@@ -690,12 +771,16 @@ public sealed class OmiRulesEngine : IGameRulesEngine
                 ["teamTricks"] = new Godot.Collections.Array { team0, team1 },
                 ["loserTeam"] = loserTeam,
                 ["trumpTeam"] = state.TrumpTeamIndexThisRound,
-                ["baseLoss"] = baseLoss,
-                ["drawBonusApplied"] = drawBonus,
-                ["kapothiBonusApplied"] = kapothiBonus,
-                ["totalLoss"] = totalLoss,
+                ["baseLoss"] = baseLossDecisive,
+                ["drawBonusApplied"] = drawBonusDecisive,
+                ["kapothiBonusApplied"] = kapothiBonusDecisive,
+                ["totalLoss"] = totalLossDecisive,
                 ["pendingDrawBonusNext"] = state.PendingDrawBonusCredits,
-                ["consecutiveDraws"] = state.ConsecutiveDraws
+                ["consecutiveDraws"] = state.ConsecutiveDraws,
+                ["kapothiAccepted"] = false,
+                ["kapothiCallingTeam"] = state.KapothiCallingTeamThisRound,
+                ["kapothiSucceeded"] = false,
+                ["creditLoserTeam"] = loserTeam
             }
         });
 
@@ -706,7 +791,7 @@ public sealed class OmiRulesEngine : IGameRulesEngine
             {
                 ["teamCredits"] = new Godot.Collections.Array { state.TeamCredits[0], state.TeamCredits[1] },
                 ["loserTeam"] = loserTeam,
-                ["totalLoss"] = totalLoss
+                ["totalLoss"] = totalLossDecisive
             }
         });
 
@@ -730,6 +815,42 @@ public sealed class OmiRulesEngine : IGameRulesEngine
 
         state.Phase = OmiPhase.RoundScore;
         state.PhaseDeadlineUnixSeconds = 0;
+    }
+
+    private static bool TryResolveKapothiCreditLoserTeam(OmiMatchState state, out int creditLoserTeam, out bool kapothiSucceeded)
+    {
+        creditLoserTeam = -1;
+        kapothiSucceeded = false;
+        if (!state.KapothiAcceptedThisRound ||
+            state.KapothiCallingTeamThisRound is < 0 or > 1 ||
+            state.CompletedTricksCount != 8)
+        {
+            return false;
+        }
+
+        var callingTeam = state.KapothiCallingTeamThisRound;
+        kapothiSucceeded = state.TeamTricks[callingTeam] == 8;
+        creditLoserTeam = kapothiSucceeded ? 1 - callingTeam : callingTeam;
+        return true;
+    }
+
+    private static void AdvanceDrawStreak(OmiMatchState state)
+    {
+        if (state.ConsecutiveDraws == 0)
+        {
+            state.PendingDrawBonusCredits = 1;
+            state.ConsecutiveDraws = 1;
+            return;
+        }
+
+        state.PendingDrawBonusCredits = 0;
+        state.ConsecutiveDraws = 0;
+    }
+
+    private static void ResetDrawStreak(OmiMatchState state)
+    {
+        state.PendingDrawBonusCredits = 0;
+        state.ConsecutiveDraws = 0;
     }
 
     private static bool ShouldOpenKapothiWindow(OmiMatchState state)

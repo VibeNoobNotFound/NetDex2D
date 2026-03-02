@@ -26,6 +26,7 @@ public sealed class OmiMatchState
     public int TrumpTeamIndexThisRound { get; set; } = -1;
     public int KapothiEligibleTeam { get; set; } = -1;
     public int KapothiTargetTeam { get; set; } = -1;
+    public int KapothiCallingTeamThisRound { get; set; } = -1;
     public bool KapothiOfferedThisRound { get; set; }
     public bool KapothiAcceptedThisRound { get; set; }
     public bool KapothiWindowConsumed { get; set; }
@@ -77,6 +78,7 @@ public sealed class OmiMatchState
         TrumpTeamIndexThisRound = -1;
         KapothiEligibleTeam = -1;
         KapothiTargetTeam = -1;
+        KapothiCallingTeamThisRound = -1;
         KapothiOfferedThisRound = false;
         KapothiAcceptedThisRound = false;
         KapothiWindowConsumed = false;
@@ -102,6 +104,7 @@ public sealed class OmiMatchState
             TrumpTeamIndexThisRound = TrumpTeamIndexThisRound,
             KapothiEligibleTeam = KapothiEligibleTeam,
             KapothiTargetTeam = KapothiTargetTeam,
+            KapothiCallingTeamThisRound = KapothiCallingTeamThisRound,
             KapothiOfferedThisRound = KapothiOfferedThisRound,
             KapothiAcceptedThisRound = KapothiAcceptedThisRound,
             KapothiWindowConsumed = KapothiWindowConsumed,

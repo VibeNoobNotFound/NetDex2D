@@ -61,6 +61,7 @@ Important keys:
 - `trumpTeamIndexThisRound`
 - `kapothiEligibleTeam`
 - `kapothiTargetTeam`
+- `kapothiCallingTeamThisRound`
 - `kapothiOfferedThisRound`
 - `kapothiAcceptedThisRound`
 - `kapothiWindowConsumed`
@@ -148,5 +149,18 @@ Participant entries include:
 - `round_resolved`
 - `credits_updated`
 - `match_ended`
+
+`round_resolved` payload includes (among other fields):
+
+- `winnerTeam`
+- `loserTeam` (trick-loser for decisive trick outcomes)
+- `baseLoss`
+- `drawBonusApplied`
+- `kapothiBonusApplied`
+- `totalLoss`
+- `kapothiAccepted`
+- `kapothiCallingTeam`
+- `kapothiSucceeded`
+- `creditLoserTeam` (team whose credits were actually debited)
 
 Kapothi events are currently state-driven via snapshots (and may be added to broadcast list later if needed for richer client-only effects).

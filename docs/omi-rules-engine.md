@@ -55,26 +55,41 @@ Project-specific variant:
 - proposal timeout => auto-skip
 - response timeout => auto-reject
 
-If accepted, `KapothiAcceptedThisRound = true`, and final decisive loss gets `+2` credits.
+If accepted:
 
-## New scoring model
+- `KapothiAcceptedThisRound = true`.
+- contract caller persists in `KapothiCallingTeamThisRound`.
+- success = caller takes all 8 tricks.
+- failure = opponent takes at least 1 trick (caller loses Kapothi contract even if caller still has more tricks).
+
+## Scoring model
 
 No sweep auto-match-end by tricks. Match ends by credits reaching `0` (or forfeit path).
 
-On decisive rounds:
+On non-Kapothi rounds:
 
-- `baseLoss = 2` if loser is trump team.
+- `baseLoss = 2` if trick-loser is trump team.
 - `baseLoss = 1` otherwise.
 - `drawBonus = PendingDrawBonusCredits` (`0` or `1`).
-- `kapothiBonus = 2` if Kapothi accepted; otherwise `0`.
+- `kapothiBonus = 0`.
+- `totalLoss = baseLoss + drawBonus`.
+
+On accepted Kapothi rounds:
+
+- credit loser is determined by contract outcome (not trick majority).
+- `baseLoss = 2` if credit loser is trump team.
+- `baseLoss = 1` otherwise.
+- `drawBonus = PendingDrawBonusCredits` (`0` or `1`).
+- `kapothiBonus = 2`.
 - `totalLoss = baseLoss + drawBonus + kapothiBonus`.
 
-On draws:
+Draw bookkeeping:
 
 - first consecutive draw arms bonus: `PendingDrawBonusCredits = 1`, `ConsecutiveDraws = 1`.
 - second consecutive draw cancels bonus: `PendingDrawBonusCredits = 0`, `ConsecutiveDraws = 0`.
+- accepted Kapothi ending `4-4` still runs draw bookkeeping while also applying Kapothi scoring.
 
-On decisive resolution:
+On non-draw resolution:
 
 - pending draw bonus and consecutive draw counter reset to zero.
 
@@ -87,6 +102,7 @@ On decisive resolution:
 - `TrumpTeamIndexThisRound`
 - `KapothiEligibleTeam`
 - `KapothiTargetTeam`
+- `KapothiCallingTeamThisRound`
 - `KapothiOfferedThisRound`
 - `KapothiAcceptedThisRound`
 - `KapothiWindowConsumed`
@@ -102,7 +118,7 @@ Core events now include Kapothi and richer round payload:
 - `kapothi_skipped`
 - `kapothi_accepted`
 - `kapothi_rejected`
-- `round_resolved` (with `baseLoss`, `drawBonusApplied`, `kapothiBonusApplied`, `totalLoss`, etc.)
+- `round_resolved` (with `baseLoss`, `drawBonusApplied`, `kapothiBonusApplied`, `totalLoss`, `kapothiAccepted`, `kapothiCallingTeam`, `kapothiSucceeded`, `creditLoserTeam`, etc.)
 
 ## Reconnect/forfeit
 

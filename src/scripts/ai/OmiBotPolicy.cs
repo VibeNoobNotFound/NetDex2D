@@ -21,7 +21,7 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
 
     private sealed record OutcomeEstimate(
         double AverageUtility,
-        double WinRate,
+        double FavorableRate,
         int Samples);
 
     public MatchCommand ChooseCommand(BotPerceptionState perception, IGameRulesEngine rulesEngine, CancellationToken cancellationToken)
@@ -348,7 +348,7 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
             _ => 0.0
         };
 
-        var shouldAccept = acceptOutcome.WinRate >= comebackThreshold &&
+        var shouldAccept = acceptOutcome.FavorableRate >= comebackThreshold &&
                            acceptOutcome.AverageUtility + acceptMargin >= rejectOutcome.AverageUtility;
         return shouldAccept ? accept : reject;
     }
@@ -380,8 +380,10 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
         int sampleCount)
     {
         var team = perception.BotSeat.TeamIndex();
+        var opponent = 1 - team;
+        var baselineCreditDelta = perception.PublicState.TeamCredits[team] - perception.PublicState.TeamCredits[opponent];
         var total = 0.0;
-        var wins = 0;
+        var favorable = 0;
         var samples = 0;
 
         for (var i = 0; i < sampleCount; i++)
@@ -400,9 +402,9 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
 
             RolloutToRoundEnd(simulated, perception.BotSeat, rulesEngine, random, cancellationToken);
             total += EvaluateRoundUtility(simulated, team);
-            if (simulated.RoundWinnerTeam.HasValue && simulated.RoundWinnerTeam.Value == team)
+            if (IsScoringFavorableOutcome(simulated, team, baselineCreditDelta))
             {
-                wins += 1;
+                favorable += 1;
             }
 
             samples += 1;
@@ -413,7 +415,7 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
             return new OutcomeEstimate(double.NegativeInfinity, 0.0, 0);
         }
 
-        return new OutcomeEstimate(total / samples, wins / (double)samples, samples);
+        return new OutcomeEstimate(total / samples, favorable / (double)samples, samples);
     }
 
     private void RolloutToRoundEnd(
@@ -708,7 +710,12 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
         var trickDelta = state.TeamTricks[botTeam] - state.TeamTricks[opponent];
         var utility = trickDelta * 9.0;
 
-        if (state.RoundWinnerTeam.HasValue)
+        if (TryResolveKapothiCreditLoserTeam(state, out var kapothiCreditLoserTeam))
+        {
+            var scoringWinner = 1 - kapothiCreditLoserTeam;
+            utility += scoringWinner == botTeam ? 120.0 : -120.0;
+        }
+        else if (state.RoundWinnerTeam.HasValue)
         {
             utility += state.RoundWinnerTeam.Value == botTeam ? 120.0 : -120.0;
         }
@@ -720,21 +727,27 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
 
         utility += (state.TeamCredits[botTeam] - state.TeamCredits[opponent]) * 3.0;
 
+        if (state.KapothiAcceptedThisRound && state.KapothiCallingTeamThisRound is >= 0 and <= 1)
+        {
+            var callingTeam = state.KapothiCallingTeamThisRound;
+            var opposingTeam = 1 - callingTeam;
+            if (botTeam == callingTeam)
+            {
+                utility -= state.TeamTricks[opposingTeam] * 24.0;
+            }
+            else if (botTeam == opposingTeam)
+            {
+                utility += state.TeamTricks[botTeam] * 24.0;
+            }
+        }
+
         if (trickDelta < 0)
         {
             utility -= state.PendingDrawBonusCredits * 6.0;
-            if (state.KapothiAcceptedThisRound)
-            {
-                utility -= 12.0;
-            }
         }
         else if (trickDelta > 0)
         {
             utility += state.PendingDrawBonusCredits * 2.0;
-            if (state.KapothiAcceptedThisRound)
-            {
-                utility += 5.0;
-            }
         }
 
         if (state.TrumpTeamIndexThisRound == botTeam && trickDelta < 0)
@@ -743,6 +756,44 @@ public sealed class OmiBotPolicy : IOmiBotPolicy
         }
 
         return utility;
+    }
+
+    private static bool IsScoringFavorableOutcome(OmiMatchState state, int team, int baselineCreditDelta)
+    {
+        var opponent = 1 - team;
+        var finalCreditDelta = state.TeamCredits[team] - state.TeamCredits[opponent];
+        if (finalCreditDelta > baselineCreditDelta)
+        {
+            return true;
+        }
+
+        if (finalCreditDelta < baselineCreditDelta)
+        {
+            return false;
+        }
+
+        if (TryResolveKapothiCreditLoserTeam(state, out var kapothiCreditLoserTeam))
+        {
+            return kapothiCreditLoserTeam != team;
+        }
+
+        return state.RoundWinnerTeam.HasValue && state.RoundWinnerTeam.Value == team;
+    }
+
+    private static bool TryResolveKapothiCreditLoserTeam(OmiMatchState state, out int creditLoserTeam)
+    {
+        creditLoserTeam = -1;
+        if (!state.KapothiAcceptedThisRound ||
+            state.KapothiCallingTeamThisRound is < 0 or > 1 ||
+            state.CompletedTricksCount != 8)
+        {
+            return false;
+        }
+
+        var callingTeam = state.KapothiCallingTeamThisRound;
+        var kapothiSucceeded = state.TeamTricks[callingTeam] == 8;
+        creditLoserTeam = kapothiSucceeded ? 1 - callingTeam : callingTeam;
+        return true;
     }
 
     private static OmiMatchState SampleDeterminizedState(BotPerceptionState perception, Random random, bool strictVoidConstraints)

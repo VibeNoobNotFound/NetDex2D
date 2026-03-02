@@ -13,4 +13,4 @@
 
 ## Round/match ending
 - Round scoring updates credits/stake according to Omi logic.
-- Match ends on credit exhaustion or sweep condition.
+- Match ends on credit exhaustion (or forfeit).

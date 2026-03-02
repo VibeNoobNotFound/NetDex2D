@@ -57,14 +57,20 @@ If no Kapothi window is opened (or after it closes), flow returns to `TrickPlay`
 
 After 8 tricks:
 
-- Draw:
+- Non-Kapothi draw:
 - first draw arms `+1` pending bonus.
 - second consecutive draw cancels pending bonus.
-- Decisive round:
-- base loss is `2` if trump team lost, else `1`.
+- Non-Kapothi decisive round:
+- base loss is `2` if trick-loser is trump team, else `1`.
 - add pending draw bonus (`0/1`).
-- add Kapothi accepted bonus (`+2`) if accepted this round.
-- loser credits decrease by total loss.
+- trick-loser credits decrease by total loss.
+- Accepted Kapothi round:
+- contract caller is team that proposed.
+- Kapothi success: caller takes all 8 tricks; opponent becomes credit loser.
+- Kapothi failure: opponent takes at least 1 trick; caller becomes credit loser.
+- credit loser pays `baseLoss + 2 + pendingDrawBonus`.
+- `baseLoss` is still trump-sensitive (`2` if credit loser is trump team, else `1`).
+- if accepted Kapothi ends `4-4`, draw streak bookkeeping still updates and Kapothi loss still applies.
 
 No immediate match end from `8-0` tricks. `8-0` is just decisive scoring under the same formula.
 
