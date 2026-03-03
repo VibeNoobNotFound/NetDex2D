@@ -133,6 +133,55 @@ horizontal_alignment = 1
 [node name="EffectsIntensityOption" type="OptionButton" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 layout_mode = 2
 
+[node name="FluentBlurToggle" type="CheckButton" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+button_pressed = true
+text = "Fluent Blur Enabled"
+
+[node name="FluentBlurQualityLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "Fluent Blur Quality"
+horizontal_alignment = 1
+
+[node name="FluentBlurQualityOption" type="OptionButton" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="FluentBlurStrengthLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "Fluent Blur Strength: 100%"
+horizontal_alignment = 1
+
+[node name="FluentBlurStrengthSlider" type="HSlider" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+min_value = 50.0
+max_value = 500.0
+step = 5.0
+value = 100.0
+
+[node name="FluentBlurDarknessLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "Fluent Blur Darkness: 125%"
+horizontal_alignment = 1
+
+[node name="FluentBlurDarknessSlider" type="HSlider" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+min_value = 50.0
+max_value = 300.0
+step = 5.0
+value = 125.0
+
+[node name="FluentBlurReflectionLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "Glass Reflection: 100%"
+horizontal_alignment = 1
+
+[node name="FluentBlurReflectionSlider" type="HSlider" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+min_value = 0.0
+max_value = 300.0
+step = 5.0
+value = 100.0
+
 [node name="HSeparator4" type="HSeparator" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer" unique_id=724222860]
 layout_mode = 2
 

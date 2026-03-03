@@ -12,6 +12,7 @@
 [ext_resource type="Script" path="res://scripts/ui/polish/ScreenTransitionController.cs" id="10_transition"]
 [ext_resource type="Script" path="res://scripts/ui/polish/UiInteractionFx.cs" id="11_interaction"]
 [ext_resource type="PackedScene" path="res://scenes/ui/polish/UiOverlay.tscn" id="12_overlay"]
+[ext_resource type="Script" path="res://scripts/ui/polish/UiFluentBlurBinder.cs" id="13_blur"]
 
 [node name="Main" type="Control" unique_id=665908007]
 layout_mode = 3
@@ -33,6 +34,9 @@ mouse_filter = 2
 texture = ExtResource("8_bg")
 expand_mode = 1
 stretch_mode = 6
+
+[node name="UiBackBufferCopy" type="BackBufferCopy" parent="."]
+copy_mode = 2
 
 [node name="MainMenu" parent="." unique_id=358429399 instance=ExtResource("1_main")]
 layout_mode = 1
@@ -72,6 +76,9 @@ script = ExtResource("10_transition")
 
 [node name="UiInteractionFx" type="Node" parent="."]
 script = ExtResource("11_interaction")
+
+[node name="UiFluentBlurBinder" type="Node" parent="."]
+script = ExtResource("13_blur")
 
 [node name="UiOverlay" parent="." instance=ExtResource("12_overlay")]
 
