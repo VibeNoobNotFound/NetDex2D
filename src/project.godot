@@ -30,6 +30,7 @@ NetworkManager="*res://scripts/network/NetworkManager.cs"
 AiCoordinator="*res://scripts/ai/AiCoordinator.cs"
 AudioManager="*res://scripts/managers/AudioManager.cs"
 UpdateManager="*res://scripts/updates/UpdateManager.cs"
+UiFeedbackService="*res://scripts/ui/polish/UiFeedbackService.cs"
 
 [display]
 

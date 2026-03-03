@@ -9,6 +9,7 @@
 [ext_resource type="Theme" uid="uid://cw8rwx6wmwqw1" path="res://assets/themes/NetDexModernTheme.tres" id="7_theme"]
 [ext_resource type="Texture2D" uid="uid://mku26sjwuy1p" path="res://assets/images/background-red.jpg" id="8_bg"]
 [ext_resource type="PackedScene" path="res://scenes/ui/AboutScreen.tscn" id="9_about"]
+[ext_resource type="PackedScene" path="res://scenes/ui/polish/UiOverlay.tscn" id="12_overlay"]
 
 [node name="Main" type="Control" unique_id=665908007]
 layout_mode = 3
@@ -63,5 +64,7 @@ layout_mode = 1
 [node name="AboutScreen" parent="." unique_id=1775961048 instance=ExtResource("9_about")]
 visible = false
 layout_mode = 1
+
+[node name="UiOverlay" parent="." instance=ExtResource("12_overlay")]
 
 [editable path="MainMenu"]
