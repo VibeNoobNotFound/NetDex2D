@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 using NetDex.Managers;
 using NetDex.UI.Polish;
@@ -6,7 +7,10 @@ namespace NetDex.UI.Main;
 
 public partial class SettingsMenu : Control
 {
+    private readonly Dictionary<Control, SettingHelp> _settingHelp = new();
+
     private CheckButton _fullscreenToggle = null!;
+    private ScrollContainer _scrollContainer = null!;
     private HSlider _resolutionSlider = null!;
     private Label _qualityLabel = null!;
     private Label _musicValueLabel = null!;
@@ -26,6 +30,10 @@ public partial class SettingsMenu : Control
     private HSlider _fluentBlurDarknessSlider = null!;
     private Label _fluentBlurReflectionLabel = null!;
     private HSlider _fluentBlurReflectionSlider = null!;
+    private PanelContainer _infoPanel = null!;
+    private Label _infoNameLabel = null!;
+    private Label _infoDescriptionLabel = null!;
+    private Label _infoHintLabel = null!;
 
     private bool _isMobile;
     private bool _isLoadingValues;
@@ -34,11 +42,12 @@ public partial class SettingsMenu : Control
     public override void _Ready()
     {
         VisibilityChanged += OnVisibilityChanged;
+        GetViewport().SizeChanged += OnViewportSizeChanged;
 
-        var scrollContainer = GetNode<ScrollContainer>("ScrollContainer");
-        scrollContainer.Set("vertical_scroll_mode", 2);
-        scrollContainer.Set("horizontal_scroll_mode", 0);
-        scrollContainer.FollowFocus = true;
+        _scrollContainer = GetNode<ScrollContainer>("ScrollContainer");
+        _scrollContainer.Set("vertical_scroll_mode", 2);
+        _scrollContainer.Set("horizontal_scroll_mode", 0);
+        _scrollContainer.FollowFocus = true;
 
         var vbox = GetNode<VBoxContainer>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer");
 
@@ -66,6 +75,10 @@ public partial class SettingsMenu : Control
         _fluentBlurDarknessSlider = vbox.GetNode<HSlider>("AdvancedBlurSection/FluentBlurDarknessSlider");
         _fluentBlurReflectionLabel = vbox.GetNode<Label>("AdvancedBlurSection/FluentBlurReflectionLabel");
         _fluentBlurReflectionSlider = vbox.GetNode<HSlider>("AdvancedBlurSection/FluentBlurReflectionSlider");
+        _infoPanel = GetNode<PanelContainer>("InfoPanel");
+        _infoNameLabel = GetNode<Label>("InfoPanel/InfoVBox/InfoNameLabel");
+        _infoDescriptionLabel = GetNode<Label>("InfoPanel/InfoVBox/InfoDescriptionLabel");
+        _infoHintLabel = GetNode<Label>("InfoPanel/InfoVBox/InfoHintLabel");
 
         string platform = OS.GetName();
         _isMobile = platform == "Android" || platform == "iOS";
@@ -98,11 +111,15 @@ public partial class SettingsMenu : Control
         _fluentBlurReflectionSlider.ValueChanged += OnFluentBlurReflectionChanged;
 
         SetAdvancedBlurExpanded(false);
+        InitializeSettingHelp();
+        ShowSettingHelp(_resolutionSlider);
+        SetInfoPanelVisibility();
     }
 
     public override void _ExitTree()
     {
         VisibilityChanged -= OnVisibilityChanged;
+        GetViewport().SizeChanged -= OnViewportSizeChanged;
     }
 
     private void PopulateEffectsIntensity()
@@ -142,6 +159,7 @@ public partial class SettingsMenu : Control
 
     private void OnQualitySliderChanged(double value)
     {
+        ShowSettingHelp(_resolutionSlider);
         _qualityLabel.Text = $"Render Scale: {(int)value}%";
         GetWindow().ContentScaleFactor = (float)(value / 100.0);
         AudioManager.Instance?.PlayUiCue(UiSfxCue.Focus, 0.35f, 0.01f);
@@ -150,6 +168,7 @@ public partial class SettingsMenu : Control
 
     private void OnMusicVolumeChanged(double value)
     {
+        ShowSettingHelp(_musicSlider);
         _musicValueLabel.Text = $"Music Volume: {(int)value}%";
         AudioManager.Instance?.SetMusicVolumePercent(value);
         AudioManager.Instance?.PlayUiCue(UiSfxCue.Focus, 0.28f, 0.01f);
@@ -158,6 +177,7 @@ public partial class SettingsMenu : Control
 
     private void OnSfxVolumeChanged(double value)
     {
+        ShowSettingHelp(_sfxSlider);
         _sfxValueLabel.Text = $"SFX Volume: {(int)value}%";
         AudioManager.Instance?.SetSfxVolumePercent(value);
         AudioManager.Instance?.PlayUiCue(UiSfxCue.Focus, 0.4f, 0.01f);
@@ -166,6 +186,7 @@ public partial class SettingsMenu : Control
 
     private void OnReduceMotionToggled(bool toggled)
     {
+        ShowSettingHelp(_reduceMotionToggle);
         if (_isLoadingValues)
         {
             return;
@@ -180,6 +201,7 @@ public partial class SettingsMenu : Control
 
     private void OnUiSfxToggled(bool toggled)
     {
+        ShowSettingHelp(_uiSfxToggle);
         if (_isLoadingValues)
         {
             return;
@@ -194,6 +216,7 @@ public partial class SettingsMenu : Control
 
     private void OnEffectsIntensitySelected(long index)
     {
+        ShowSettingHelp(_effectsIntensityOption);
         if (_isLoadingValues)
         {
             return;
@@ -216,6 +239,7 @@ public partial class SettingsMenu : Control
 
     private void OnFluentBlurToggled(bool enabled)
     {
+        ShowSettingHelp(_fluentBlurToggle);
         if (_isLoadingValues)
         {
             return;
@@ -230,6 +254,7 @@ public partial class SettingsMenu : Control
 
     private void OnFluentBlurQualitySelected(long index)
     {
+        ShowSettingHelp(_fluentBlurQualityOption);
         if (_isLoadingValues)
         {
             return;
@@ -252,6 +277,7 @@ public partial class SettingsMenu : Control
 
     private void OnFluentBlurStrengthChanged(double value)
     {
+        ShowSettingHelp(_fluentBlurStrengthSlider);
         _fluentBlurStrengthLabel.Text = $"Fluent Blur Strength: {(int)value}%";
         if (_isLoadingValues)
         {
@@ -265,6 +291,7 @@ public partial class SettingsMenu : Control
 
     private void OnFluentBlurDarknessChanged(double value)
     {
+        ShowSettingHelp(_fluentBlurDarknessSlider);
         _fluentBlurDarknessLabel.Text = $"Fluent Blur Darkness: {(int)value}%";
         if (_isLoadingValues)
         {
@@ -278,6 +305,7 @@ public partial class SettingsMenu : Control
 
     private void OnFluentBlurReflectionChanged(double value)
     {
+        ShowSettingHelp(_fluentBlurReflectionSlider);
         _fluentBlurReflectionLabel.Text = $"Glass Reflection: {(int)value}%";
         if (_isLoadingValues)
         {
@@ -291,6 +319,7 @@ public partial class SettingsMenu : Control
 
     private void OnAdvancedBlurTogglePressed()
     {
+        ShowSettingHelp(_advancedBlurToggleButton);
         SetAdvancedBlurExpanded(!_advancedBlurExpanded);
     }
 
@@ -301,6 +330,55 @@ public partial class SettingsMenu : Control
         _advancedBlurToggleButton.Text = expanded
             ? "Hide Advanced Blur Tuning"
             : "Show Advanced Blur Tuning";
+    }
+
+    private void InitializeSettingHelp()
+    {
+        RegisterSettingHelp(_fullscreenToggle, "Fullscreen", "Switches between exclusive fullscreen and windowed mode.", "Enable for immersive play on desktop.");
+        RegisterSettingHelp(_resolutionSlider, "Render Scale", "Adjusts rendering resolution scale for sharpness vs performance.", "Lower values improve FPS on weaker devices.");
+        RegisterSettingHelp(_musicSlider, "Music Volume", "Controls background music volume.", "Set to 0% to mute music.");
+        RegisterSettingHelp(_sfxSlider, "SFX Volume", "Controls gameplay and interface sound effect volume.", "Set to 0% to mute sound effects.");
+        RegisterSettingHelp(_reduceMotionToggle, "Reduce Motion", "Reduces motion-heavy UI effects and shakes.", "Recommended if you prefer calmer visuals.");
+        RegisterSettingHelp(_uiSfxToggle, "UI SFX", "Enables or disables user interface sound cues.", "Disable if you prefer silent menu navigation.");
+        RegisterSettingHelp(_effectsIntensityOption, "Effects Intensity", "Controls global visual effect intensity.", "Use Low for battery/performance, Max for full visuals.");
+        RegisterSettingHelp(_fluentBlurToggle, "Fluent Blur", "Turns frosted blur panel effects on or off.", "Disable for maximum performance.");
+        RegisterSettingHelp(_fluentBlurQualityOption, "Fluent Blur Quality", "Sets blur quality preset.", "High looks best, Low is lighter.");
+        RegisterSettingHelp(_advancedBlurToggleButton, "Advanced Blur Tuning", "Shows detailed blur controls.", "Adjust only if you want custom visual style.");
+        RegisterSettingHelp(_fluentBlurStrengthSlider, "Blur Strength", "Controls how strongly backgrounds are blurred.", "Higher values produce heavier glass blur.");
+        RegisterSettingHelp(_fluentBlurDarknessSlider, "Blur Darkness", "Darkens frosted panels for better contrast.", "Increase if text needs stronger separation.");
+        RegisterSettingHelp(_fluentBlurReflectionSlider, "Glass Reflection", "Adjusts highlight intensity on glass edges.", "Higher values create stronger reflective gradient.");
+    }
+
+    private void RegisterSettingHelp(Control control, string name, string description, string hint)
+    {
+        _settingHelp[control] = new SettingHelp(name, description, hint);
+        control.FocusEntered += () => ShowSettingHelp(control);
+        control.MouseEntered += () => ShowSettingHelp(control);
+    }
+
+    private void ShowSettingHelp(Control control)
+    {
+        if (!_settingHelp.TryGetValue(control, out var help))
+        {
+            return;
+        }
+
+        _infoNameLabel.Text = help.Name;
+        _infoDescriptionLabel.Text = help.Description;
+        _infoHintLabel.Text = $"Hint: {help.Hint}";
+    }
+
+    private void OnViewportSizeChanged()
+    {
+        SetInfoPanelVisibility();
+    }
+
+    private void SetInfoPanelVisibility()
+    {
+        var width = GetViewportRect().Size.X;
+        var showInfoPanel = !_isMobile && width >= 1040f;
+        _infoPanel.Visible = showInfoPanel;
+        _scrollContainer.SetOffset(Side.Right, showInfoPanel ? -360f : 0f);
     }
 
     private void SaveSettings()
@@ -437,6 +515,8 @@ public partial class SettingsMenu : Control
             return;
         }
 
+        SetInfoPanelVisibility();
+
         var panel = GetNode<Control>("ScrollContainer/MarginContainer/CenterContainer/MainPanel");
         panel.Modulate = new Color(1f, 1f, 1f, 0f);
         panel.Scale = new Vector2(0.97f, 0.97f);
@@ -459,5 +539,19 @@ public partial class SettingsMenu : Control
     private static void OnAboutPressed()
     {
         GameManager.Instance?.LoadAboutScreen("SettingsMenu");
+    }
+
+    private readonly struct SettingHelp
+    {
+        public SettingHelp(string name, string description, string hint)
+        {
+            Name = name;
+            Description = description;
+            Hint = hint;
+        }
+
+        public string Name { get; }
+        public string Description { get; }
+        public string Hint { get; }
     }
 }

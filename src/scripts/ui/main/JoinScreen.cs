@@ -16,7 +16,6 @@ public partial class JoinScreen : Control
     private Label _statusLabel = null!;
     private Control _mainPanel = null!;
     private OptionButton _roleOption = null!;
-    private OptionButton _directRoleOption = null!;
 
     private readonly List<RoomAdvertisement> _roomCache = new();
     private string _selectedRoomKey = string.Empty;
@@ -25,19 +24,18 @@ public partial class JoinScreen : Control
     public override void _Ready()
     {
         _mainPanel = GetNode<Control>("ScrollContainer/MarginContainer/CenterContainer/MainPanel");
-        _playerNameInput = GetNode<LineEdit>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/PlayerNameInput");
+        _playerNameInput = GetNode<LineEdit>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/TopRow/PlayerNameInput");
         _directIpInput = GetNode<LineEdit>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/DirectIpInput");
         _roomsList = GetNode<ItemList>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/DiscoveredRooms");
         _statusLabel = GetNode<Label>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/StatusLabel");
-        _roleOption = GetNode<OptionButton>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/RoleOption");
-        _directRoleOption = GetNode<OptionButton>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/DirectRoleOption");
+        _roleOption = GetNode<OptionButton>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/TopRow/RoleOption");
 
         _playerNameInput.Text = NetworkManager.Instance.GetSavedPlayerName();
         PopulateRoleOptions();
 
         _roomsList.ItemSelected += OnRoomSelected;
 
-        GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/RefreshRoomsButton").Pressed += OnRefreshPressed;
+        GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/LanHeaderRow/RefreshRoomsButton").Pressed += OnRefreshPressed;
         GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/JoinButton").Pressed += OnJoinSelectedPressed;
         GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/DirectJoinButton").Pressed += OnDirectJoinPressed;
         GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/BackButton").Pressed += OnBackPressed;
@@ -81,11 +79,6 @@ public partial class JoinScreen : Control
         _roleOption.AddItem("Player", (int)ParticipantRole.Player);
         _roleOption.AddItem("Spectator", (int)ParticipantRole.Spectator);
         _roleOption.Select(0);
-
-        _directRoleOption.Clear();
-        _directRoleOption.AddItem("Player", (int)ParticipantRole.Player);
-        _directRoleOption.AddItem("Spectator", (int)ParticipantRole.Spectator);
-        _directRoleOption.Select(0);
     }
 
     private void OnJoinSelectedPressed()
@@ -95,7 +88,7 @@ public partial class JoinScreen : Control
 
     private void OnDirectJoinPressed()
     {
-        JoinDirectIp(GetSelectedRole(_directRoleOption));
+        JoinDirectIp(GetSelectedRole(_roleOption));
     }
 
     private static void OnBackPressed()

@@ -11,6 +11,43 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_set")
 
+[node name="InfoPanel" type="PanelContainer" parent="."]
+custom_minimum_size = Vector2(320, 0)
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -340.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+
+[node name="InfoVBox" type="VBoxContainer" parent="InfoPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="InfoTitleLabel" type="Label" parent="InfoPanel/InfoVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Setting Details"
+horizontal_alignment = 1
+
+[node name="InfoNameLabel" type="Label" parent="InfoPanel/InfoVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Render Scale"
+
+[node name="InfoDescriptionLabel" type="Label" parent="InfoPanel/InfoVBox"]
+layout_mode = 2
+text = "Controls rendering resolution scale to balance sharpness and performance."
+autowrap_mode = 2
+
+[node name="InfoHintLabel" type="Label" parent="InfoPanel/InfoVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Hint: lower values improve performance on weaker devices."
+autowrap_mode = 2
+
 [node name="ScrollContainer" type="ScrollContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -30,17 +67,19 @@ theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 20
 
-[node name="CenterContainer" type="CenterContainer" parent="ScrollContainer/MarginContainer" unique_id=1214846100]
+[node name="CenterContainer" type="HBoxContainer" parent="ScrollContainer/MarginContainer" unique_id=1214846100]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+theme_override_constants/separation = 14
 
 [node name="MainPanel" type="PanelContainer" parent="ScrollContainer/MarginContainer/CenterContainer" unique_id=337007470]
-custom_minimum_size = Vector2(420, 860)
+custom_minimum_size = Vector2(0, 860)
 layout_mode = 2
+size_flags_horizontal = 3
 
 [node name="VBoxContainer" type="VBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel" unique_id=1620394684]
-custom_minimum_size = Vector2(400, 0)
+custom_minimum_size = Vector2(0, 0)
 layout_mode = 2
 theme_override_constants/separation = 12
 

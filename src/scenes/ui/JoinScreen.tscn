@@ -30,14 +30,15 @@ theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 20
 
-[node name="CenterContainer" type="CenterContainer" parent="ScrollContainer/MarginContainer"]
+[node name="CenterContainer" type="MarginContainer" parent="ScrollContainer/MarginContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
 [node name="MainPanel" type="PanelContainer" parent="ScrollContainer/MarginContainer/CenterContainer"]
 layout_mode = 2
-custom_minimum_size = Vector2(420, 780)
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 780)
 
 [node name="VBoxContainer" type="VBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel"]
 layout_mode = 2
@@ -49,31 +50,42 @@ theme_override_font_sizes/font_size = 36
 text = "Join Room"
 horizontal_alignment = 1
 
-[node name="PlayerNameInput" type="LineEdit" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+[node name="TopRow" type="HBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PlayerNameInput" type="LineEdit" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/TopRow"]
+layout_mode = 2
+size_flags_horizontal = 3
 placeholder_text = "Player Name"
 
-[node name="RoomsLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+[node name="RoleLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/TopRow"]
 layout_mode = 2
+text = "Join As"
+vertical_alignment = 1
+
+[node name="RoleOption" type="OptionButton" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/TopRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+
+[node name="LanHeaderRow" type="HBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="RoomsLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/LanHeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
 text = "LAN Rooms"
+
+[node name="RefreshRoomsButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/LanHeaderRow"]
+custom_minimum_size = Vector2(150, 44)
+layout_mode = 2
+text = "Refresh Rooms"
 
 [node name="DiscoveredRooms" type="ItemList" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 custom_minimum_size = Vector2(0, 220)
 layout_mode = 2
 select_mode = 1
-
-[node name="RefreshRoomsButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
-custom_minimum_size = Vector2(0, 44)
-layout_mode = 2
-text = "Refresh Rooms"
-
-[node name="RoleLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
-layout_mode = 2
-text = "Join As"
-horizontal_alignment = 1
-
-[node name="RoleOption" type="OptionButton" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
-layout_mode = 2
 
 [node name="JoinButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 custom_minimum_size = Vector2(0, 48)
@@ -86,14 +98,6 @@ layout_mode = 2
 [node name="DirectIpInput" type="LineEdit" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 layout_mode = 2
 placeholder_text = "Direct Host IP"
-
-[node name="DirectRoleLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
-layout_mode = 2
-text = "Direct Join As"
-horizontal_alignment = 1
-
-[node name="DirectRoleOption" type="OptionButton" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
-layout_mode = 2
 
 [node name="DirectJoinButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 custom_minimum_size = Vector2(0, 48)
