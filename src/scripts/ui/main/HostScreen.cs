@@ -87,7 +87,7 @@ public partial class HostScreen : Control
             _createHostButton.Disabled = false;
         }
 
-        SetStatus($"[{status}] {message}", notify: false);
+        SetStatus(FormatConnectionStatus(status, message), notify: false);
     }
 
     private void OnNetworkMessage(string message)
@@ -111,6 +111,20 @@ public partial class HostScreen : Control
         {
             UiFeedbackService.Instance?.ShowToast(status, severity, 2.2);
         }
+    }
+
+    private static string FormatConnectionStatus(string status, string message)
+    {
+        var normalized = status.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "creating" => "Creating room...",
+            "connecting" => "Opening room connection...",
+            "hosting" => "Room is open for players.",
+            "offline" => string.IsNullOrWhiteSpace(message) ? "Offline." : message,
+            "error" => string.IsNullOrWhiteSpace(message) ? "Host error." : message,
+            _ => string.IsNullOrWhiteSpace(message) ? status : message
+        };
     }
 
     private void OnVisibilityChanged()

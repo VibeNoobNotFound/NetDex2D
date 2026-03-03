@@ -15,6 +15,8 @@ public partial class JoinScreen : Control
     private ItemList _roomsList = null!;
     private Label _statusLabel = null!;
     private Control _mainPanel = null!;
+    private OptionButton _roleOption = null!;
+    private OptionButton _directRoleOption = null!;
 
     private readonly List<RoomAdvertisement> _roomCache = new();
     private string _selectedRoomKey = string.Empty;
@@ -27,16 +29,17 @@ public partial class JoinScreen : Control
         _directIpInput = GetNode<LineEdit>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/DirectIpInput");
         _roomsList = GetNode<ItemList>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/DiscoveredRooms");
         _statusLabel = GetNode<Label>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/StatusLabel");
+        _roleOption = GetNode<OptionButton>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/RoleOption");
+        _directRoleOption = GetNode<OptionButton>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/DirectRoleOption");
 
         _playerNameInput.Text = NetworkManager.Instance.GetSavedPlayerName();
+        PopulateRoleOptions();
 
         _roomsList.ItemSelected += OnRoomSelected;
 
         GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/RefreshRoomsButton").Pressed += OnRefreshPressed;
-        GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/JoinButton").Pressed += OnJoinAsPlayerPressed;
-        GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/SpectateButton").Pressed += OnJoinAsSpectatorPressed;
+        GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/JoinButton").Pressed += OnJoinSelectedPressed;
         GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/DirectJoinButton").Pressed += OnDirectJoinPressed;
-        GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/DirectSpectateButton").Pressed += OnDirectSpectatePressed;
         GetNode<Button>("ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/BackButton").Pressed += OnBackPressed;
 
         VisibilityChanged += OnVisibilityChanged;
@@ -72,24 +75,27 @@ public partial class JoinScreen : Control
         AudioManager.Instance?.PlayUiCue(UiSfxCue.Focus, 0.72f, 0.02f);
     }
 
-    private void OnJoinAsPlayerPressed()
+    private void PopulateRoleOptions()
     {
-        JoinSelectedRoom(ParticipantRole.Player);
+        _roleOption.Clear();
+        _roleOption.AddItem("Player", (int)ParticipantRole.Player);
+        _roleOption.AddItem("Spectator", (int)ParticipantRole.Spectator);
+        _roleOption.Select(0);
+
+        _directRoleOption.Clear();
+        _directRoleOption.AddItem("Player", (int)ParticipantRole.Player);
+        _directRoleOption.AddItem("Spectator", (int)ParticipantRole.Spectator);
+        _directRoleOption.Select(0);
     }
 
-    private void OnJoinAsSpectatorPressed()
+    private void OnJoinSelectedPressed()
     {
-        JoinSelectedRoom(ParticipantRole.Spectator);
+        JoinSelectedRoom(GetSelectedRole(_roleOption));
     }
 
     private void OnDirectJoinPressed()
     {
-        JoinDirectIp(ParticipantRole.Player);
-    }
-
-    private void OnDirectSpectatePressed()
-    {
-        JoinDirectIp(ParticipantRole.Spectator);
+        JoinDirectIp(GetSelectedRole(_directRoleOption));
     }
 
     private static void OnBackPressed()
@@ -224,7 +230,7 @@ public partial class JoinScreen : Control
             UiFeedbackService.Instance?.SetLoading(false);
         }
 
-        SetStatus($"[{status}] {message}", notify: false);
+        SetStatus(FormatConnectionStatus(status, message), notify: false);
     }
 
     private void OnNetworkMessage(string message)
@@ -262,6 +268,27 @@ public partial class JoinScreen : Control
         {
             UiFeedbackService.Instance?.ShowToast(text, severity, 2.2);
         }
+    }
+
+    private static ParticipantRole GetSelectedRole(OptionButton optionButton)
+    {
+        var selected = optionButton.GetSelectedId();
+        return selected == (int)ParticipantRole.Spectator
+            ? ParticipantRole.Spectator
+            : ParticipantRole.Player;
+    }
+
+    private static string FormatConnectionStatus(string status, string message)
+    {
+        var normalized = status.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "connected" => "Connected to room.",
+            "connecting" => "Connecting...",
+            "disconnected" => string.IsNullOrWhiteSpace(message) ? "Disconnected." : message,
+            "failed" => string.IsNullOrWhiteSpace(message) ? "Connection failed." : message,
+            _ => string.IsNullOrWhiteSpace(message) ? status : message
+        };
     }
 
     private void OnVisibilityChanged()

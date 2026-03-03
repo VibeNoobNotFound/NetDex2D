@@ -12,15 +12,6 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_join")
 
-[node name="Background" type="ColorRect" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.04, 0.03, 0.03, 0.04)
-
 [node name="ScrollContainer" type="ScrollContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -34,9 +25,9 @@ script = ExtResource("2_scroll")
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_constants/margin_left = 16
+theme_override_constants/margin_left = 20
 theme_override_constants/margin_top = 20
-theme_override_constants/margin_right = 16
+theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 20
 
 [node name="CenterContainer" type="CenterContainer" parent="ScrollContainer/MarginContainer"]
@@ -46,7 +37,7 @@ size_flags_vertical = 3
 
 [node name="MainPanel" type="PanelContainer" parent="ScrollContainer/MarginContainer/CenterContainer"]
 layout_mode = 2
-custom_minimum_size = Vector2(360, 760)
+custom_minimum_size = Vector2(420, 780)
 
 [node name="VBoxContainer" type="VBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel"]
 layout_mode = 2
@@ -72,18 +63,22 @@ layout_mode = 2
 select_mode = 1
 
 [node name="RefreshRoomsButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "Refresh Rooms"
 
-[node name="JoinButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
-custom_minimum_size = Vector2(0, 40)
+[node name="RoleLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 layout_mode = 2
-text = "Join as Player"
+text = "Join As"
+horizontal_alignment = 1
 
-[node name="SpectateButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
-custom_minimum_size = Vector2(0, 40)
+[node name="RoleOption" type="OptionButton" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 layout_mode = 2
-text = "Join as Spectator"
+
+[node name="JoinButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "Join Selected Room"
 
 [node name="HSeparator" type="HSeparator" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 layout_mode = 2
@@ -92,13 +87,18 @@ layout_mode = 2
 layout_mode = 2
 placeholder_text = "Direct Host IP"
 
-[node name="DirectJoinButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+[node name="DirectRoleLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 layout_mode = 2
-text = "Direct Join as Player"
+text = "Direct Join As"
+horizontal_alignment = 1
 
-[node name="DirectSpectateButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+[node name="DirectRoleOption" type="OptionButton" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 layout_mode = 2
-text = "Direct Join as Spectator"
+
+[node name="DirectJoinButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "Direct Join"
 
 [node name="BackButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 custom_minimum_size = Vector2(0, 44)
@@ -107,5 +107,6 @@ text = "Back"
 
 [node name="StatusLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 layout_mode = 2
-text = "Ready"
+theme_override_font_sizes/font_size = 16
+text = "Select a room or enter a direct host IP."
 autowrap_mode = 2

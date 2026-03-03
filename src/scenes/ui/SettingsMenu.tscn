@@ -11,15 +11,6 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_set")
 
-[node name="ColorRect" type="ColorRect" parent="." unique_id=787140769]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.04, 0.03, 0.03, 0.04)
-
 [node name="ScrollContainer" type="ScrollContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -34,9 +25,9 @@ vertical_scroll_mode = 2
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_constants/margin_left = 16
+theme_override_constants/margin_left = 20
 theme_override_constants/margin_top = 20
-theme_override_constants/margin_right = 16
+theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 20
 
 [node name="CenterContainer" type="CenterContainer" parent="ScrollContainer/MarginContainer" unique_id=1214846100]
@@ -45,7 +36,7 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 
 [node name="MainPanel" type="PanelContainer" parent="ScrollContainer/MarginContainer/CenterContainer" unique_id=337007470]
-custom_minimum_size = Vector2(560, 860)
+custom_minimum_size = Vector2(420, 860)
 layout_mode = 2
 
 [node name="VBoxContainer" type="VBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel" unique_id=1620394684]
@@ -146,36 +137,45 @@ horizontal_alignment = 1
 [node name="FluentBlurQualityOption" type="OptionButton" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 layout_mode = 2
 
-[node name="FluentBlurStrengthLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+[node name="AdvancedBlurToggleButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Show Advanced Blur Tuning"
+
+[node name="AdvancedBlurSection" type="VBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="FluentBlurStrengthLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AdvancedBlurSection"]
 layout_mode = 2
 text = "Fluent Blur Strength: 100%"
 horizontal_alignment = 1
 
-[node name="FluentBlurStrengthSlider" type="HSlider" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+[node name="FluentBlurStrengthSlider" type="HSlider" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AdvancedBlurSection"]
 layout_mode = 2
 min_value = 50.0
 max_value = 500.0
 step = 5.0
 value = 100.0
 
-[node name="FluentBlurDarknessLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+[node name="FluentBlurDarknessLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AdvancedBlurSection"]
 layout_mode = 2
 text = "Fluent Blur Darkness: 125%"
 horizontal_alignment = 1
 
-[node name="FluentBlurDarknessSlider" type="HSlider" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+[node name="FluentBlurDarknessSlider" type="HSlider" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AdvancedBlurSection"]
 layout_mode = 2
 min_value = 50.0
 max_value = 300.0
 step = 5.0
 value = 125.0
 
-[node name="FluentBlurReflectionLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+[node name="FluentBlurReflectionLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AdvancedBlurSection"]
 layout_mode = 2
 text = "Glass Reflection: 100%"
 horizontal_alignment = 1
 
-[node name="FluentBlurReflectionSlider" type="HSlider" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+[node name="FluentBlurReflectionSlider" type="HSlider" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AdvancedBlurSection"]
 layout_mode = 2
 min_value = 0.0
 max_value = 300.0

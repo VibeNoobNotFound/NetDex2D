@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using NetDex.Managers;
 using NetDex.UI.Polish;
@@ -132,8 +133,10 @@ public partial class AboutScreen : Control
         _platformLabel.Text = $"Platform: {platformText}";
         _developerLabel.Text = $"Developer: {developer}";
         _copyrightLabel.Text = $"Copyright: {copyright}";
-        _repoLabel.Text = $"Repo: {repositoryUrl}";
-        _releasesLabel.Text = $"Releases: {releasesUrl}";
+        _repoLabel.Text = $"Repo: {CompactUrl(repositoryUrl)}";
+        _repoLabel.TooltipText = repositoryUrl;
+        _releasesLabel.Text = $"Releases: {CompactUrl(releasesUrl)}";
+        _releasesLabel.TooltipText = releasesUrl;
     }
 
     private void RefreshUpdateUi()
@@ -280,5 +283,28 @@ public partial class AboutScreen : Control
         RefreshUpdateUi();
         UiFeedbackService.Instance?.SetLoading(false);
         UiFeedbackService.Instance?.ShowToast(message, UiSeverity.Error, 2.4);
+    }
+
+    private static string CompactUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || url == "-")
+        {
+            return "-";
+        }
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            return url;
+        }
+
+        var host = uri.Host;
+        var path = uri.AbsolutePath.Trim('/');
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return host;
+        }
+
+        var compactPath = path.Length > 24 ? $"{path[..24]}..." : path;
+        return $"{host}/{compactPath}";
     }
 }

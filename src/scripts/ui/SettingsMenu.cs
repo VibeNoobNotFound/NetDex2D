@@ -18,6 +18,8 @@ public partial class SettingsMenu : Control
     private OptionButton _effectsIntensityOption = null!;
     private CheckButton _fluentBlurToggle = null!;
     private OptionButton _fluentBlurQualityOption = null!;
+    private Button _advancedBlurToggleButton = null!;
+    private VBoxContainer _advancedBlurSection = null!;
     private Label _fluentBlurStrengthLabel = null!;
     private HSlider _fluentBlurStrengthSlider = null!;
     private Label _fluentBlurDarknessLabel = null!;
@@ -27,6 +29,7 @@ public partial class SettingsMenu : Control
 
     private bool _isMobile;
     private bool _isLoadingValues;
+    private bool _advancedBlurExpanded;
 
     public override void _Ready()
     {
@@ -55,12 +58,14 @@ public partial class SettingsMenu : Control
         _effectsIntensityOption = vbox.GetNode<OptionButton>("EffectsIntensityOption");
         _fluentBlurToggle = vbox.GetNode<CheckButton>("FluentBlurToggle");
         _fluentBlurQualityOption = vbox.GetNode<OptionButton>("FluentBlurQualityOption");
-        _fluentBlurStrengthLabel = vbox.GetNode<Label>("FluentBlurStrengthLabel");
-        _fluentBlurStrengthSlider = vbox.GetNode<HSlider>("FluentBlurStrengthSlider");
-        _fluentBlurDarknessLabel = vbox.GetNode<Label>("FluentBlurDarknessLabel");
-        _fluentBlurDarknessSlider = vbox.GetNode<HSlider>("FluentBlurDarknessSlider");
-        _fluentBlurReflectionLabel = vbox.GetNode<Label>("FluentBlurReflectionLabel");
-        _fluentBlurReflectionSlider = vbox.GetNode<HSlider>("FluentBlurReflectionSlider");
+        _advancedBlurToggleButton = vbox.GetNode<Button>("AdvancedBlurToggleButton");
+        _advancedBlurSection = vbox.GetNode<VBoxContainer>("AdvancedBlurSection");
+        _fluentBlurStrengthLabel = vbox.GetNode<Label>("AdvancedBlurSection/FluentBlurStrengthLabel");
+        _fluentBlurStrengthSlider = vbox.GetNode<HSlider>("AdvancedBlurSection/FluentBlurStrengthSlider");
+        _fluentBlurDarknessLabel = vbox.GetNode<Label>("AdvancedBlurSection/FluentBlurDarknessLabel");
+        _fluentBlurDarknessSlider = vbox.GetNode<HSlider>("AdvancedBlurSection/FluentBlurDarknessSlider");
+        _fluentBlurReflectionLabel = vbox.GetNode<Label>("AdvancedBlurSection/FluentBlurReflectionLabel");
+        _fluentBlurReflectionSlider = vbox.GetNode<HSlider>("AdvancedBlurSection/FluentBlurReflectionSlider");
 
         string platform = OS.GetName();
         _isMobile = platform == "Android" || platform == "iOS";
@@ -87,9 +92,12 @@ public partial class SettingsMenu : Control
         _effectsIntensityOption.ItemSelected += OnEffectsIntensitySelected;
         _fluentBlurToggle.Toggled += OnFluentBlurToggled;
         _fluentBlurQualityOption.ItemSelected += OnFluentBlurQualitySelected;
+        _advancedBlurToggleButton.Pressed += OnAdvancedBlurTogglePressed;
         _fluentBlurStrengthSlider.ValueChanged += OnFluentBlurStrengthChanged;
         _fluentBlurDarknessSlider.ValueChanged += OnFluentBlurDarknessChanged;
         _fluentBlurReflectionSlider.ValueChanged += OnFluentBlurReflectionChanged;
+
+        SetAdvancedBlurExpanded(false);
     }
 
     public override void _ExitTree()
@@ -279,6 +287,20 @@ public partial class SettingsMenu : Control
         UiSettings.SetFluentBlurReflection((float)(value / 100.0));
         UiSettings.Save();
         SaveSettings();
+    }
+
+    private void OnAdvancedBlurTogglePressed()
+    {
+        SetAdvancedBlurExpanded(!_advancedBlurExpanded);
+    }
+
+    private void SetAdvancedBlurExpanded(bool expanded)
+    {
+        _advancedBlurExpanded = expanded;
+        _advancedBlurSection.Visible = expanded;
+        _advancedBlurToggleButton.Text = expanded
+            ? "Hide Advanced Blur Tuning"
+            : "Show Advanced Blur Tuning";
     }
 
     private void SaveSettings()

@@ -23,6 +23,9 @@ public partial class LobbyScreen : Control
     private CheckButton _aiAutoFillCheck = null!;
     private OptionButton _aiDifficultyOption = null!;
     private Button _applyAiSettingsButton = null!;
+    private VBoxContainer _hostSetupBody = null!;
+    private Label _hostSetupSummaryLabel = null!;
+    private Button _hostSetupToggleButton = null!;
     private VBoxContainer _mainContainer = null!;
 
     private readonly Dictionary<SeatPosition, OptionButton> _seatOptions = new();
@@ -30,6 +33,8 @@ public partial class LobbyScreen : Control
     private RoomMatchLifecycle? _lastLifecycle;
     private int _lastPlayerCount = -1;
     private int _lastSpectatorCount = -1;
+    private bool _hostSetupExpanded = true;
+    private bool _hostSetupInitialized;
 
     public override void _Ready()
     {
@@ -41,12 +46,17 @@ public partial class LobbyScreen : Control
 
         _seatsPanel = GetNode<PanelContainer>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel");
 
-        _seatOptions[SeatPosition.Bottom] = GetNode<OptionButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/BottomSeatOption");
-        _seatOptions[SeatPosition.Right] = GetNode<OptionButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/RightSeatOption");
-        _seatOptions[SeatPosition.Top] = GetNode<OptionButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/TopSeatOption");
-        _seatOptions[SeatPosition.Left] = GetNode<OptionButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsGrid/LeftSeatOption");
+        _hostSetupBody = GetNode<VBoxContainer>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/HostSetupBody");
+        _hostSetupSummaryLabel = GetNode<Label>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/HostSetupSummaryLabel");
+        _hostSetupToggleButton = GetNode<Button>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/HostSetupHeader/HostSetupToggleButton");
+        _hostSetupToggleButton.Pressed += OnToggleHostSetupPressed;
 
-        var applySeatsButton = GetNode<Button>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/SeatsActions/ApplySeatsButton");
+        _seatOptions[SeatPosition.Bottom] = GetNode<OptionButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/HostSetupBody/SeatsGrid/BottomSeatOption");
+        _seatOptions[SeatPosition.Right] = GetNode<OptionButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/HostSetupBody/SeatsGrid/RightSeatOption");
+        _seatOptions[SeatPosition.Top] = GetNode<OptionButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/HostSetupBody/SeatsGrid/TopSeatOption");
+        _seatOptions[SeatPosition.Left] = GetNode<OptionButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/HostSetupBody/SeatsGrid/LeftSeatOption");
+
+        var applySeatsButton = GetNode<Button>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/HostSetupBody/SeatsActions/ApplySeatsButton");
         applySeatsButton.Pressed += OnApplySeatsPressed;
 
         _startMatchButton = GetNode<Button>("ScrollContainer/MarginContainer/VBoxContainer/Actions/StartMatchButton");
@@ -55,9 +65,9 @@ public partial class LobbyScreen : Control
         _returnToGameButton = GetNode<Button>("ScrollContainer/MarginContainer/VBoxContainer/Actions/ReturnToGameButton");
         _returnToGameButton.Pressed += OnReturnToGamePressed;
 
-        _aiAutoFillCheck = GetNode<CheckButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions/AiAutoFillCheck");
-        _aiDifficultyOption = GetNode<OptionButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiOptions/AiDifficultyRow/AiDifficultyOption");
-        _applyAiSettingsButton = GetNode<Button>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/AiActions/ApplyAiSettingsButton");
+        _aiAutoFillCheck = GetNode<CheckButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/HostSetupBody/AiOptions/AiAutoFillCheck");
+        _aiDifficultyOption = GetNode<OptionButton>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/HostSetupBody/AiOptions/AiDifficultyRow/AiDifficultyOption");
+        _applyAiSettingsButton = GetNode<Button>("ScrollContainer/MarginContainer/VBoxContainer/SeatsPanel/SeatsVBox/HostSetupBody/AiActions/ApplyAiSettingsButton");
         _applyAiSettingsButton.Pressed += OnApplyAiSettingsPressed;
         PopulateAiDifficultyOptions();
 
@@ -101,6 +111,7 @@ public partial class LobbyScreen : Control
         if (room == null)
         {
             _lastLifecycle = null;
+            _seatsPanel.Visible = false;
             _roomLabel.Text = "No active room";
             SetStatus("Join or host a room from the main menu.", notify: false);
             return;
@@ -138,7 +149,7 @@ public partial class LobbyScreen : Control
         var isHost = LobbyManager.Instance.IsHostAuthority;
         _startMatchButton.Visible = isHost;
         _startMatchButton.Disabled = !isHost;
-        _seatsPanel.Visible = isHost;
+        _seatsPanel.Visible = true;
         _aiAutoFillCheck.Disabled = !isHost;
         _aiDifficultyOption.Disabled = !isHost;
         _applyAiSettingsButton.Disabled = !isHost;
@@ -153,6 +164,7 @@ public partial class LobbyScreen : Control
 
         _aiAutoFillCheck.ButtonPressed = room.AiAutoFillEnabled;
         SelectDifficulty(room.SelectedAiDifficulty);
+        UpdateHostSetupState(room, isHost);
 
         if (previousLifecycle != null && previousLifecycle != room.MatchLifecycle)
         {
@@ -347,6 +359,40 @@ public partial class LobbyScreen : Control
         {
             UiFeedbackService.Instance?.ShowToast(text, severity, 2.1);
         }
+    }
+
+    private void OnToggleHostSetupPressed()
+    {
+        SetHostSetupExpanded(!_hostSetupExpanded, isHost: true);
+    }
+
+    private void UpdateHostSetupState(RoomState room, bool isHost)
+    {
+        if (!_hostSetupInitialized)
+        {
+            _hostSetupExpanded = isHost;
+            _hostSetupInitialized = true;
+        }
+
+        if (!isHost)
+        {
+            _hostSetupExpanded = false;
+        }
+
+        var seatsFilled = room.SeatAssignments.Values.Count(v => v.HasValue);
+        _hostSetupSummaryLabel.Text =
+            $"Auto-fill: {(room.AiAutoFillEnabled ? "On" : "Off")} | AI: {room.SelectedAiDifficulty} | Seats: {seatsFilled}/4";
+        SetHostSetupExpanded(_hostSetupExpanded, isHost);
+    }
+
+    private void SetHostSetupExpanded(bool expanded, bool isHost)
+    {
+        _hostSetupExpanded = expanded && isHost;
+        _hostSetupBody.Visible = _hostSetupExpanded;
+        _hostSetupSummaryLabel.Visible = !_hostSetupExpanded;
+        _hostSetupToggleButton.Visible = isHost;
+        _hostSetupToggleButton.Disabled = !isHost;
+        _hostSetupToggleButton.Text = _hostSetupExpanded ? "Collapse" : "Expand";
     }
 
     private void OnVisibilityChanged()
