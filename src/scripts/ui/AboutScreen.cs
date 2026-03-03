@@ -1,5 +1,6 @@
 using Godot;
 using NetDex.Managers;
+using NetDex.UI.Polish;
 using NetDex.Updates;
 
 namespace NetDex.UI.Main;
@@ -19,6 +20,8 @@ public partial class AboutScreen : Control
     private Button _updateActionButton = null!;
     private Button _skipUpdateButton = null!;
     private Button _backButton = null!;
+    private Control _mainPanel = null!;
+    private VBoxContainer _vbox = null!;
 
     public override void _Ready()
     {
@@ -28,30 +31,33 @@ public partial class AboutScreen : Control
 
     private void InitializeUi()
     {
+        var panelPath = "ScrollContainer/MarginContainer/CenterContainer/MainPanel";
+        _mainPanel = GetNodeOrNull<Control>(panelPath) ?? new PanelContainer();
+
         var basePath = "ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer";
-        var vbox = GetNodeOrNull<VBoxContainer>(basePath);
-        if (vbox == null)
+        _vbox = GetNodeOrNull<VBoxContainer>(basePath) ?? new VBoxContainer();
+        if (_vbox == null)
         {
             GD.PushError($"AboutScreen init failed: missing VBoxContainer at '{basePath}'.");
             return;
         }
 
-        _gameNameLabel = vbox.GetNodeOrNull<Label>("GameNameLabel") ?? new Label();
-        _versionLabel = vbox.GetNodeOrNull<Label>("VersionLabel") ?? new Label();
-        _platformLabel = vbox.GetNodeOrNull<Label>("PlatformLabel") ?? new Label();
-        _developerLabel = vbox.GetNodeOrNull<Label>("DeveloperLabel") ?? new Label();
-        _copyrightLabel = vbox.GetNodeOrNull<Label>("CopyrightLabel") ?? new Label();
-        _repoLabel = vbox.GetNodeOrNull<Label>("RepoUrlLabel") ?? new Label();
-        _releasesLabel = vbox.GetNodeOrNull<Label>("ReleasesUrlLabel") ?? new Label();
+        _gameNameLabel = _vbox.GetNodeOrNull<Label>("GameNameLabel") ?? new Label();
+        _versionLabel = _vbox.GetNodeOrNull<Label>("VersionLabel") ?? new Label();
+        _platformLabel = _vbox.GetNodeOrNull<Label>("PlatformLabel") ?? new Label();
+        _developerLabel = _vbox.GetNodeOrNull<Label>("DeveloperLabel") ?? new Label();
+        _copyrightLabel = _vbox.GetNodeOrNull<Label>("CopyrightLabel") ?? new Label();
+        _repoLabel = _vbox.GetNodeOrNull<Label>("RepoUrlLabel") ?? new Label();
+        _releasesLabel = _vbox.GetNodeOrNull<Label>("ReleasesUrlLabel") ?? new Label();
 
-        _updateStatusLabel = vbox.GetNodeOrNull<Label>("UpdateStatusLabel") ?? new Label();
-        _latestVersionLabel = vbox.GetNodeOrNull<Label>("LatestVersionLabel") ?? new Label();
+        _updateStatusLabel = _vbox.GetNodeOrNull<Label>("UpdateStatusLabel") ?? new Label();
+        _latestVersionLabel = _vbox.GetNodeOrNull<Label>("LatestVersionLabel") ?? new Label();
 
-        _updateActionButton = vbox.GetNodeOrNull<Button>("UpdateActionButton") ?? new Button();
-        _skipUpdateButton = vbox.GetNodeOrNull<Button>("SkipUpdateButton") ?? new Button();
-        _backButton = vbox.GetNodeOrNull<Button>("BackButton") ?? new Button();
+        _updateActionButton = _vbox.GetNodeOrNull<Button>("UpdateActionButton") ?? new Button();
+        _skipUpdateButton = _vbox.GetNodeOrNull<Button>("SkipUpdateButton") ?? new Button();
+        _backButton = _vbox.GetNodeOrNull<Button>("BackButton") ?? new Button();
 
-        var checkUpdatesButton = vbox.GetNodeOrNull<Button>("CheckUpdatesButton");
+        var checkUpdatesButton = _vbox.GetNodeOrNull<Button>("CheckUpdatesButton");
         if (checkUpdatesButton != null)
         {
             checkUpdatesButton.Pressed += OnCheckUpdatesPressed;
@@ -60,13 +66,13 @@ public partial class AboutScreen : Control
         _updateActionButton.Pressed += OnUpdateActionPressed;
         _skipUpdateButton.Pressed += OnSkipUpdatePressed;
 
-        var openRepoButton = vbox.GetNodeOrNull<Button>("OpenRepoButton");
+        var openRepoButton = _vbox.GetNodeOrNull<Button>("OpenRepoButton");
         if (openRepoButton != null)
         {
             openRepoButton.Pressed += OnOpenRepoPressed;
         }
 
-        var openReleasesButton = vbox.GetNodeOrNull<Button>("OpenReleasesButton");
+        var openReleasesButton = _vbox.GetNodeOrNull<Button>("OpenReleasesButton");
         if (openReleasesButton != null)
         {
             openReleasesButton.Pressed += OnOpenReleasesPressed;
@@ -139,6 +145,7 @@ public partial class AboutScreen : Control
             _latestVersionLabel.Text = "Latest version: -";
             _updateActionButton.Disabled = true;
             _skipUpdateButton.Disabled = true;
+            UiFeedbackService.Instance?.ApplyStatusLabelStyle(_updateStatusLabel, UiSeverity.Warning);
             return;
         }
 
@@ -151,21 +158,27 @@ public partial class AboutScreen : Control
         _updateActionButton.Text = updater.GetActionLabel();
         _updateActionButton.Disabled = !updater.IsUpdateAvailable;
         _skipUpdateButton.Disabled = !updater.IsUpdateAvailable;
+
+        var severity = UiFeedbackService.InferSeverity(updater.StatusMessage);
+        UiFeedbackService.Instance?.ApplyStatusLabelStyle(_updateStatusLabel, severity);
     }
 
-    private static void OnCheckUpdatesPressed()
+    private void OnCheckUpdatesPressed()
     {
+        UiFeedbackService.Instance?.SetLoading(true, "Checking for updates...");
         UpdateManager.Instance?.CheckForUpdates(manual: true);
     }
 
-    private static void OnUpdateActionPressed()
+    private void OnUpdateActionPressed()
     {
+        UiFeedbackService.Instance?.SetLoading(true, "Preparing update...");
         UpdateManager.Instance?.PerformUpdateAction();
     }
 
-    private static void OnSkipUpdatePressed()
+    private void OnSkipUpdatePressed()
     {
         UpdateManager.Instance?.SkipCurrentUpdate();
+        UiFeedbackService.Instance?.ShowToast("Update skipped", UiSeverity.Info, 1.8);
     }
 
     private static void OnOpenRepoPressed()
@@ -210,21 +223,62 @@ public partial class AboutScreen : Control
 
         PopulateInfo();
         RefreshUpdateUi();
+
+        _mainPanel.Modulate = new Color(1f, 1f, 1f, 0f);
+        _mainPanel.Scale = new Vector2(0.97f, 0.97f);
+
+        var panelTween = CreateTween();
+        panelTween.SetParallel(true);
+        panelTween.TweenProperty(_mainPanel, "modulate:a", 1f, (float)UiMotionProfile.PanelEnterDurationSeconds)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        panelTween.TweenProperty(_mainPanel, "scale", Vector2.One, (float)UiMotionProfile.PanelEnterDurationSeconds)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+
+        var idx = 0;
+        foreach (Node child in _vbox.GetChildren())
+        {
+            if (child is not Control control)
+            {
+                continue;
+            }
+
+            control.Modulate = new Color(1f, 1f, 1f, 0f);
+            var tween = CreateTween();
+            tween.TweenProperty(control, "modulate:a", 1f, 0.16f)
+                .SetDelay(0.04f * idx)
+                .SetTrans(Tween.TransitionType.Cubic)
+                .SetEase(Tween.EaseType.Out);
+            idx++;
+        }
     }
 
     private void OnUpdateStatusChanged(string state, string message)
     {
         RefreshUpdateUi();
+
+        var lower = state.ToLowerInvariant();
+        var loading = lower is "checking" or "downloading" or "installing";
+        UiFeedbackService.Instance?.SetLoading(loading, message);
+
+        if (!loading && UiFeedbackService.InferSeverity(message) == UiSeverity.Error)
+        {
+            UiFeedbackService.Instance?.ShowToast(message, UiSeverity.Error, 2.4);
+        }
     }
 
     private void OnUpdateAvailable(string version, string platformActionLabel)
     {
         _updateActionButton.Text = platformActionLabel;
         RefreshUpdateUi();
+        UiFeedbackService.Instance?.ShowBanner($"Update available: {version}", UiSeverity.Success, 2.2);
     }
 
     private void OnUpdateIssueRaised(int issueCode, string message)
     {
         RefreshUpdateUi();
+        UiFeedbackService.Instance?.SetLoading(false);
+        UiFeedbackService.Instance?.ShowToast(message, UiSeverity.Error, 2.4);
     }
 }

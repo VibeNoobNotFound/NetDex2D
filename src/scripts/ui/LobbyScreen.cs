@@ -6,6 +6,7 @@ using NetDex.Core.Enums;
 using NetDex.Lobby;
 using NetDex.Managers;
 using NetDex.Networking;
+using NetDex.UI.Polish;
 
 namespace NetDex.UI.Lobby;
 
@@ -22,13 +23,17 @@ public partial class LobbyScreen : Control
     private CheckButton _aiAutoFillCheck = null!;
     private OptionButton _aiDifficultyOption = null!;
     private Button _applyAiSettingsButton = null!;
+    private VBoxContainer _mainContainer = null!;
 
     private readonly Dictionary<SeatPosition, OptionButton> _seatOptions = new();
     private readonly Dictionary<int, AiDifficulty> _difficultyByOptionId = new();
     private RoomMatchLifecycle? _lastLifecycle;
+    private int _lastPlayerCount = -1;
+    private int _lastSpectatorCount = -1;
 
     public override void _Ready()
     {
+        _mainContainer = GetNode<VBoxContainer>("ScrollContainer/MarginContainer/VBoxContainer");
         _roomLabel = GetNode<Label>("ScrollContainer/MarginContainer/VBoxContainer/RoomLabel");
         _statusLabel = GetNode<Label>("ScrollContainer/MarginContainer/VBoxContainer/StatusLabel");
         _playersList = GetNode<ItemList>("ScrollContainer/MarginContainer/VBoxContainer/HBox/PlayersPanel/PlayersVBox/PlayersList");
@@ -59,6 +64,8 @@ public partial class LobbyScreen : Control
         var leaveButton = GetNode<Button>("ScrollContainer/MarginContainer/VBoxContainer/Actions/LeaveRoomButton");
         leaveButton.Pressed += OnLeavePressed;
 
+        VisibilityChanged += OnVisibilityChanged;
+
         LobbyManager.Instance.RoomStateChanged += RefreshLobbyView;
         NetworkManager.Instance.NetworkMessage += OnNetworkMessage;
         NetworkRpc.Instance.ServerMessage += OnServerMessage;
@@ -69,6 +76,8 @@ public partial class LobbyScreen : Control
 
     public override void _ExitTree()
     {
+        VisibilityChanged -= OnVisibilityChanged;
+
         if (LobbyManager.Instance != null)
         {
             LobbyManager.Instance.RoomStateChanged -= RefreshLobbyView;
@@ -93,7 +102,7 @@ public partial class LobbyScreen : Control
         {
             _lastLifecycle = null;
             _roomLabel.Text = "No active room";
-            _statusLabel.Text = "Join or host a room from the main menu.";
+            SetStatus("Join or host a room from the main menu.", notify: false);
             return;
         }
 
@@ -101,7 +110,7 @@ public partial class LobbyScreen : Control
         _lastLifecycle = room.MatchLifecycle;
 
         _roomLabel.Text = $"Room: {room.RoomName} | Host: {room.HostName} | State: {room.MatchLifecycle}";
-        _statusLabel.Text = $"Players: {room.PlayerCount} | Spectators: {room.SpectatorCount} | AI: {(room.AiAutoFillEnabled ? "Auto" : "Manual")} ({room.SelectedAiDifficulty})";
+        SetStatus($"Players: {room.PlayerCount} | Spectators: {room.SpectatorCount} | AI: {(room.AiAutoFillEnabled ? "Auto" : "Manual")} ({room.SelectedAiDifficulty})", notify: false);
 
         _playersList.Clear();
         _spectatorsList.Clear();
@@ -145,6 +154,27 @@ public partial class LobbyScreen : Control
         _aiAutoFillCheck.ButtonPressed = room.AiAutoFillEnabled;
         SelectDifficulty(room.SelectedAiDifficulty);
 
+        if (previousLifecycle != null && previousLifecycle != room.MatchLifecycle)
+        {
+            UiFeedbackService.Instance?.ShowBanner($"Room State: {room.MatchLifecycle}", UiSeverity.Info, 2.0);
+            AudioManager.Instance?.PlayUiCue(UiSfxCue.MatchPhase, 0.82f, 0.02f);
+        }
+
+        if (_lastPlayerCount >= 0 && room.PlayerCount != _lastPlayerCount)
+        {
+            PulseList(_playersList);
+            AudioManager.Instance?.PlayUiCue(room.PlayerCount > _lastPlayerCount ? UiSfxCue.LobbyJoin : UiSfxCue.LobbyLeave, 0.82f, 0.02f);
+        }
+
+        if (_lastSpectatorCount >= 0 && room.SpectatorCount != _lastSpectatorCount)
+        {
+            PulseList(_spectatorsList);
+            AudioManager.Instance?.PlayUiCue(room.SpectatorCount > _lastSpectatorCount ? UiSfxCue.LobbyJoin : UiSfxCue.LobbyLeave, 0.82f, 0.02f);
+        }
+
+        _lastPlayerCount = room.PlayerCount;
+        _lastSpectatorCount = room.SpectatorCount;
+
         var shouldAutoOpenGame = room.MatchLifecycle != RoomMatchLifecycle.Lobby &&
                                  (previousLifecycle == null || previousLifecycle == RoomMatchLifecycle.Lobby);
 
@@ -152,6 +182,8 @@ public partial class LobbyScreen : Control
         {
             GameManager.Instance?.LoadGameScene();
         }
+
+        EmphasizeStartIfReady(room);
     }
 
     private void PopulateSeatOptions(RoomState room)
@@ -190,11 +222,10 @@ public partial class LobbyScreen : Control
     {
         if (!LobbyManager.Instance.IsHostAuthority)
         {
-            SetStatus("Only host can change seats.");
+            SetStatus("Only host can change seats.", notify: true);
             return;
         }
 
-        // Snapshot selected targets first to avoid live UI refreshes mutating reads mid-apply.
         var requestedSeats = new Dictionary<SeatPosition, int>();
         foreach (var pair in _seatOptions)
         {
@@ -212,7 +243,8 @@ public partial class LobbyScreen : Control
             var duplicateName = room != null && room.Participants.TryGetValue(duplicatePeer.Key, out var participant)
                 ? participant.Name
                 : $"Peer {duplicatePeer.Key}";
-            SetStatus($"Seat assignment invalid: '{duplicateName}' is selected more than once.");
+            SetStatus($"Seat assignment invalid: '{duplicateName}' is selected more than once.", notify: true);
+            ShakeSeatPanel();
             return;
         }
 
@@ -222,7 +254,7 @@ public partial class LobbyScreen : Control
             NetworkRpc.Instance.SendSeatChangeRequest(seat, peerId);
         }
 
-        SetStatus("Seat update sent.");
+        SetStatus("Seat update sent.", notify: true);
     }
 
     private void PopulateAiDifficultyOptions()
@@ -256,7 +288,7 @@ public partial class LobbyScreen : Control
     {
         if (!LobbyManager.Instance.IsHostAuthority)
         {
-            SetStatus("Only host can change AI settings.");
+            SetStatus("Only host can change AI settings.", notify: true);
             return;
         }
 
@@ -265,18 +297,19 @@ public partial class LobbyScreen : Control
             ? mapped
             : AiDifficulty.Strong;
         NetworkRpc.Instance.SendSetAiOptionsRequest(_aiAutoFillCheck.ButtonPressed, difficulty);
-        SetStatus("AI settings updated.");
+        SetStatus("AI settings updated.", notify: true);
     }
 
     private void OnStartMatchPressed()
     {
         NetworkRpc.Instance.SendStartMatchRequest();
-        SetStatus("Start match requested.");
+        SetStatus("Start match requested.", notify: true);
     }
 
     private static void OnLeavePressed()
     {
         NetworkManager.Instance.DisconnectSession("Left room");
+        UiFeedbackService.Instance?.ShowToast("Left room.", UiSeverity.Info, 1.6);
         GameManager.Instance?.LoadMainMenu();
     }
 
@@ -289,22 +322,102 @@ public partial class LobbyScreen : Control
     {
         if (eventType == "PushMatchStarted")
         {
+            UiFeedbackService.Instance?.ShowBanner("Match started", UiSeverity.Success, 1.8);
             GameManager.Instance?.LoadGameScene();
         }
     }
 
     private void OnNetworkMessage(string message)
     {
-        SetStatus(message);
+        SetStatus(message, notify: false);
     }
 
     private void OnServerMessage(string message)
     {
-        SetStatus(message);
+        SetStatus(message, notify: false);
     }
 
-    private void SetStatus(string text)
+    private void SetStatus(string text, bool notify)
     {
         _statusLabel.Text = text;
+        var severity = UiFeedbackService.InferSeverity(text);
+        UiFeedbackService.Instance?.ApplyStatusLabelStyle(_statusLabel, severity);
+
+        if (notify)
+        {
+            UiFeedbackService.Instance?.ShowToast(text, severity, 2.1);
+        }
+    }
+
+    private void OnVisibilityChanged()
+    {
+        if (!Visible)
+        {
+            return;
+        }
+
+        _mainContainer.Modulate = new Color(1f, 1f, 1f, 0f);
+        _mainContainer.Scale = new Vector2(0.98f, 0.98f);
+
+        var tween = CreateTween();
+        tween.SetParallel(true);
+        tween.TweenProperty(_mainContainer, "modulate:a", 1f, (float)UiMotionProfile.PanelEnterDurationSeconds)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        tween.TweenProperty(_mainContainer, "scale", Vector2.One, (float)UiMotionProfile.PanelEnterDurationSeconds)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+    }
+
+    private void EmphasizeStartIfReady(RoomState room)
+    {
+        var allSeatsFilled = room.SeatAssignments.Values.All(v => v.HasValue);
+        var allSeatedConnected = room.SeatAssignments.Values
+            .Where(v => v.HasValue)
+            .Select(v => v!.Value)
+            .All(peerId => room.Participants.TryGetValue(peerId, out var p) && p.IsConnected);
+
+        var ready = room.MatchLifecycle == RoomMatchLifecycle.Lobby && allSeatsFilled && allSeatedConnected;
+        if (!ready || !_startMatchButton.Visible)
+        {
+            _startMatchButton.Modulate = Colors.White;
+            _startMatchButton.Scale = Vector2.One;
+            return;
+        }
+
+        var pulse = CreateTween();
+        pulse.SetLoops(2);
+        pulse.TweenProperty(_startMatchButton, "scale", new Vector2(1.03f, 1.03f), 0.16f)
+            .SetTrans(Tween.TransitionType.Sine)
+            .SetEase(Tween.EaseType.Out);
+        pulse.TweenProperty(_startMatchButton, "scale", Vector2.One, 0.16f)
+            .SetTrans(Tween.TransitionType.Sine)
+            .SetEase(Tween.EaseType.In);
+
+        _startMatchButton.Modulate = new Color(1f, 1f, 0.92f, 1f);
+    }
+
+    private static void PulseList(Control list)
+    {
+        var tween = list.CreateTween();
+        tween.TweenProperty(list, "modulate", new Color(1.08f, 1.08f, 1.12f, 1f), 0.1f)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        tween.TweenProperty(list, "modulate", Colors.White, 0.2f)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+    }
+
+    private void ShakeSeatPanel()
+    {
+        if (UiSettings.ReduceMotion)
+        {
+            return;
+        }
+
+        var tween = CreateTween();
+        tween.TweenProperty(_seatsPanel, "rotation_degrees", -2.0f, 0.05f);
+        tween.TweenProperty(_seatsPanel, "rotation_degrees", 2.0f, 0.05f);
+        tween.TweenProperty(_seatsPanel, "rotation_degrees", 0.0f, 0.05f);
     }
 }
