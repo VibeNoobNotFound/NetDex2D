@@ -67,13 +67,13 @@ public partial class AboutScreen : Control
         _updateActionButton.Pressed += OnUpdateActionPressed;
         _skipUpdateButton.Pressed += OnSkipUpdatePressed;
 
-        var openRepoButton = _vbox.GetNodeOrNull<Button>("OpenRepoButton");
+        var openRepoButton = _vbox.GetNodeOrNull<Button>("LinksRow/OpenRepoButton");
         if (openRepoButton != null)
         {
             openRepoButton.Pressed += OnOpenRepoPressed;
         }
 
-        var openReleasesButton = _vbox.GetNodeOrNull<Button>("OpenReleasesButton");
+        var openReleasesButton = _vbox.GetNodeOrNull<Button>("LinksRow/OpenReleasesButton");
         if (openReleasesButton != null)
         {
             openReleasesButton.Pressed += OnOpenReleasesPressed;
@@ -184,26 +184,49 @@ public partial class AboutScreen : Control
         UiFeedbackService.Instance?.ShowToast("Update skipped", UiSeverity.Info, 1.8);
     }
 
-    private static void OnOpenRepoPressed()
+    private void OnOpenRepoPressed()
     {
-        var updater = UpdateManager.Instance;
-        if (updater == null)
-        {
-            return;
-        }
-
-        OS.ShellOpen(updater.RepositoryUrl);
+        OpenExternalUrl(UpdateManager.Instance?.RepositoryUrl, "repository");
     }
 
-    private static void OnOpenReleasesPressed()
+    private void OnOpenReleasesPressed()
     {
-        var updater = UpdateManager.Instance;
-        if (updater == null)
+        OpenExternalUrl(UpdateManager.Instance?.ReleasesUrl, "releases");
+    }
+
+    private void OpenExternalUrl(string? rawUrl, string label)
+    {
+        var url = NormalizeUrl(rawUrl);
+        if (string.IsNullOrWhiteSpace(url))
         {
+            UiFeedbackService.Instance?.ShowToast($"Invalid {label} URL.", UiSeverity.Error, 2.4);
+            GD.PushWarning($"AboutScreen: invalid {label} URL '{rawUrl}'.");
             return;
         }
 
-        OS.ShellOpen(updater.ReleasesUrl);
+        var result = OS.ShellOpen(url);
+        if (result != Error.Ok)
+        {
+            UiFeedbackService.Instance?.ShowToast($"Could not open {label} link.", UiSeverity.Error, 2.4);
+            GD.PushWarning($"AboutScreen: OS.ShellOpen failed for '{url}' with {result}.");
+        }
+    }
+
+    private static string NormalizeUrl(string? rawUrl)
+    {
+        if (string.IsNullOrWhiteSpace(rawUrl))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = rawUrl.Trim();
+        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return trimmed;
+        }
+
+        return $"https://{trimmed}";
     }
 
     private void OnBackPressed()
