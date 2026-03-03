@@ -48,6 +48,11 @@ custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 text = "Join"
 
+[node name="HowToPlayButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "How to Play"
+
 [node name="SettingsButton" type="Button" parent="CenterContainer/MainPanel/VBoxContainer"]
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2

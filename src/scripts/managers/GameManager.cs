@@ -18,12 +18,14 @@ public partial class GameManager : Node
         "LobbyScreen",
         "GameScreen",
         "SettingsMenu",
-        "AboutScreen"
+        "AboutScreen",
+        "HelpScreen"
     };
 
     public static GameManager Instance { get; private set; } = null!;
     private string _settingsReturnScreen = "MainMenu";
     private string _aboutReturnScreen = "MainMenu";
+    private string _helpReturnScreen = "MainMenu";
     private string _activeScreen = "MainMenu";
     private readonly SemaphoreSlim _screenSwitchGate = new(1, 1);
 
@@ -62,6 +64,17 @@ public partial class GameManager : Node
     public void ReturnFromAbout()
     {
         _ = SetMenuStateAsync(_aboutReturnScreen, ScreenTransitionStyle.Fade);
+    }
+
+    public void LoadHelpScreen(string returnScreen = "MainMenu")
+    {
+        _helpReturnScreen = string.IsNullOrWhiteSpace(returnScreen) ? "MainMenu" : returnScreen;
+        _ = SetMenuStateAsync("HelpScreen", ScreenTransitionStyle.ZoomFade);
+    }
+
+    public void ReturnFromHelp()
+    {
+        _ = SetMenuStateAsync(_helpReturnScreen, ScreenTransitionStyle.Fade);
     }
 
     public void LoadSettingsMenu(string returnScreen = "MainMenu")
@@ -130,6 +143,8 @@ public partial class GameManager : Node
             return;
         }
 
+        ResetScrollRecursive(target);
+
         if (EnsureBackgroundReady(mainRoot) is { } background)
         {
             AnimateBackground(background, menuName);
@@ -163,6 +178,12 @@ public partial class GameManager : Node
 
         target.Visible = true;
         _activeScreen = menuName;
+
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        if (GodotObject.IsInstanceValid(target))
+        {
+            ResetScrollRecursive(target);
+        }
     }
 
     private static TextureRect? EnsureBackgroundReady(Control mainRoot)
@@ -255,6 +276,20 @@ public partial class GameManager : Node
         tween.TweenProperty(background, "modulate", targetModulate, (float)UiMotionProfile.ScreenTransitionDurationSeconds)
             .SetTrans(Tween.TransitionType.Cubic)
             .SetEase(Tween.EaseType.InOut);
+    }
+
+    private static void ResetScrollRecursive(Node node)
+    {
+        if (node is ScrollContainer scrollContainer)
+        {
+            scrollContainer.ScrollVertical = 0;
+            scrollContainer.ScrollHorizontal = 0;
+        }
+
+        foreach (Node child in node.GetChildren())
+        {
+            ResetScrollRecursive(child);
+        }
     }
 
     private static bool IsKnownScreen(string menuName)

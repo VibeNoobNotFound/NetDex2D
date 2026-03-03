@@ -19,6 +19,7 @@ This scene drives `MainMenu` (`Control`) in the NetDex UI/game flow.
 | `Subtitle` | `Label` | `CenterContainer/MainPanel/VBoxContainer` |
 | `HostButton` | `Button` | `CenterContainer/MainPanel/VBoxContainer` |
 | `JoinButton` | `Button` | `CenterContainer/MainPanel/VBoxContainer` |
+| `HowToPlayButton` | `Button` | `CenterContainer/MainPanel/VBoxContainer` |
 | `SettingsButton` | `Button` | `CenterContainer/MainPanel/VBoxContainer` |
 | `AboutButton` | `Button` | `CenterContainer/MainPanel/VBoxContainer` |
 | `ExitButton` | `Button` | `CenterContainer/MainPanel/VBoxContainer` |
@@ -29,6 +30,7 @@ This scene drives `MainMenu` (`Control`) in the NetDex UI/game flow.
   - `OnAboutPressed`
   - `OnExitPressed`
   - `OnHostPressed`
+  - `OnHowToPlayPressed`
   - `OnJoinPressed`
   - `OnSettingsPressed`
 
@@ -37,6 +39,7 @@ This scene drives `MainMenu` (`Control`) in the NetDex UI/game flow.
 - OnAboutPressed -> GameManager.LoadAboutScreen()
 - OnExitPressed -> application quit
 - OnHostPressed -> GameManager.LoadHostScreen()
+- OnHowToPlayPressed -> GameManager.LoadHelpScreen()
 - OnJoinPressed -> GameManager.LoadJoinScreen()
 - OnSettingsPressed -> GameManager.LoadSettingsMenu()
 

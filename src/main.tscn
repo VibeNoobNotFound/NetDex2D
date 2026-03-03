@@ -13,6 +13,7 @@
 [ext_resource type="Script" path="res://scripts/ui/polish/UiInteractionFx.cs" id="11_interaction"]
 [ext_resource type="PackedScene" path="res://scenes/ui/polish/UiOverlay.tscn" id="12_overlay"]
 [ext_resource type="Script" path="res://scripts/ui/polish/UiFluentBlurBinder.cs" id="13_blur"]
+[ext_resource type="PackedScene" path="res://scenes/ui/HelpScreen.tscn" id="14_help"]
 
 [node name="Main" type="Control" unique_id=665908007]
 layout_mode = 3
@@ -68,6 +69,10 @@ visible = false
 layout_mode = 1
 
 [node name="AboutScreen" parent="." unique_id=1775961048 instance=ExtResource("9_about")]
+visible = false
+layout_mode = 1
+
+[node name="HelpScreen" parent="." instance=ExtResource("14_help")]
 visible = false
 layout_mode = 1
 

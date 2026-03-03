@@ -18,6 +18,7 @@ public partial class MainMenu : Control
 
         GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/HostButton").Pressed += OnHostPressed;
         GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/JoinButton").Pressed += OnJoinPressed;
+        GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/HowToPlayButton").Pressed += OnHowToPlayPressed;
         GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/SettingsButton").Pressed += OnSettingsPressed;
         GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/AboutButton").Pressed += OnAboutPressed;
         GetNode<Button>("CenterContainer/MainPanel/VBoxContainer/ExitButton").Pressed += OnExitPressed;
@@ -44,6 +45,11 @@ public partial class MainMenu : Control
     private void OnSettingsPressed()
     {
         GameManager.Instance?.LoadSettingsMenu("MainMenu");
+    }
+
+    private void OnHowToPlayPressed()
+    {
+        GameManager.Instance?.LoadHelpScreen("MainMenu");
     }
 
     private void OnAboutPressed()

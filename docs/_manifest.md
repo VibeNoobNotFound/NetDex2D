@@ -1,8 +1,8 @@
 # Documentation Manifest
 
 - Generated from source snapshot in `src/`.
-- Script files documented: `67`
-- Scene files documented: `10`
+- Script files documented: `68`
+- Scene files documented: `11`
 
 ## Script docs coverage
 
@@ -57,8 +57,9 @@
 | `scripts/network/stores/DiscoveryStore.cs` | `docs/scripts/network/stores/DiscoveryStore.md` | 5 | 0 | Documented |
 | `scripts/network/stores/IDiscoveryStore.cs` | `docs/scripts/network/stores/IDiscoveryStore.md` | 0 | 0 | Documented |
 | `scripts/ui/AboutScreen.cs` | `docs/scripts/ui/AboutScreen.md` | 15 | 0 | Documented |
+| `scripts/ui/HelpScreen.cs` | `docs/scripts/ui/HelpScreen.md` | 25 | 0 | Documented |
 | `scripts/ui/LobbyScreen.cs` | `docs/scripts/ui/LobbyScreen.md` | 15 | 0 | Documented |
-| `scripts/ui/MainMenu.cs` | `docs/scripts/ui/MainMenu.md` | 6 | 0 | Documented |
+| `scripts/ui/MainMenu.cs` | `docs/scripts/ui/MainMenu.md` | 7 | 0 | Documented |
 | `scripts/ui/PauseMenu.cs` | `docs/scripts/ui/PauseMenu.md` | 4 | 0 | Documented |
 | `scripts/ui/SettingsMenu.cs` | `docs/scripts/ui/SettingsMenu.md` | 9 | 0 | Documented |
 | `scripts/ui/common/MobileScrollContainer.cs` | `docs/scripts/ui/common/MobileScrollContainer.md` | 8 | 0 | Documented |
@@ -84,6 +85,7 @@
 | `scenes/game/Card.tscn` | `docs/scenes/game-card.md` | 2 | 1 | Documented |
 | `scenes/game/GameScreen.tscn` | `docs/scenes/game-screen.md` | 28 | 1 | Documented |
 | `scenes/ui/AboutScreen.tscn` | `docs/scenes/ui-about.md` | 27 | 2 | Documented |
+| `scenes/ui/HelpScreen.tscn` | `docs/scenes/ui-help.md` | 53 | 1 | Documented |
 | `scenes/ui/HostScreen.tscn` | `docs/scenes/ui-host.md` | 14 | 2 | Documented |
 | `scenes/ui/JoinScreen.tscn` | `docs/scenes/ui-join.md` | 20 | 2 | Documented |
 | `scenes/ui/LobbyScreen.tscn` | `docs/scenes/ui-lobby.md` | 41 | 2 | Documented |
