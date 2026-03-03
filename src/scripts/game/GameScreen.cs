@@ -87,6 +87,7 @@ public partial class GameScreen : Control
     private int _lastRoundBannerShown = -1;
     private SeatPosition? _lastTurnSeat;
     private int _dealAnimationRunId;
+    private bool _suppressInitialDeskEntryAudio = true;
     private Godot.Collections.Dictionary _pendingSnapshot = new();
 
     public override void _Ready()
@@ -216,6 +217,7 @@ public partial class GameScreen : Control
             _lastTrumpSuit = -1;
             _lastPhaseCue = null;
             _pendingSnapshot = new Godot.Collections.Dictionary();
+            _suppressInitialDeskEntryAudio = true;
             return;
         }
 
@@ -253,7 +255,7 @@ public partial class GameScreen : Control
 
         ClearHands();
         RenderHands(snapshot, phase, currentTurnSeat);
-        RenderTrickState(snapshot, roundNumber, currentTurnSeat, teamTricks);
+        RenderTrickState(snapshot, roundNumber, currentTurnSeat, teamTricks, _suppressInitialDeskEntryAudio);
         RenderActionPanel(snapshot, phase);
         if (_lastTurnSeat != currentTurnSeat)
         {
@@ -262,6 +264,7 @@ public partial class GameScreen : Control
         }
         _lastPhase = phase;
         _lastTrumpSuit = trumpSuit;
+        _suppressInitialDeskEntryAudio = false;
     }
 
     private string BuildStatusText(OmiPhase phase, int roundNumber, SeatPosition currentTurnSeat, int trumpSuit, int[] teamCredits, int[] teamTricks, int pendingDrawBonus)
@@ -1118,7 +1121,7 @@ public partial class GameScreen : Control
         UpdateSideHandLayoutFromCounts(renderedCounts);
     }
 
-    private void RenderTrickState(Godot.Collections.Dictionary snapshot, int roundNumber, SeatPosition currentTurnSeat, int[] teamTricks)
+    private void RenderTrickState(Godot.Collections.Dictionary snapshot, int roundNumber, SeatPosition currentTurnSeat, int[] teamTricks, bool suppressEntryAudio)
     {
         if (_lastRoundNumber != -1 && roundNumber != _lastRoundNumber)
         {
@@ -1180,8 +1183,10 @@ public partial class GameScreen : Control
                 .SetTrans(Tween.TransitionType.Cubic)
                 .SetEase(Tween.EaseType.Out);
             _deskCards[seat] = card;
-
-            PlaySound(_placeSounds);
+            if (!suppressEntryAudio)
+            {
+                PlaySound(_placeSounds);
+            }
         }
 
         foreach (var seat in _deskCards.Keys.ToList())
@@ -1588,6 +1593,7 @@ public partial class GameScreen : Control
         _dealSourceAnchor.Visible = false;
         _dealSourceStack.Scale = Vector2.One;
         SetDealSourceDeckRemaining(0);
+        _suppressInitialDeskEntryAudio = true;
         ClearAnimationLayerCards();
     }
 

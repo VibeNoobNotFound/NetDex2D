@@ -11,7 +11,6 @@ public static class UiSettings
     public static bool ReduceMotion { get; private set; }
     public static bool UiSfxEnabled { get; private set; } = true;
     public static UiEffectsIntensity EffectsIntensity { get; private set; } = UiEffectsIntensity.Max;
-    public static DealAnimationStyle DealAnimationStyle { get; private set; } = DealAnimationStyle.CinematicFlip;
 
     public static void EnsureLoaded()
     {
@@ -31,7 +30,6 @@ public static class UiSettings
             ReduceMotion = false;
             UiSfxEnabled = true;
             EffectsIntensity = UiEffectsIntensity.Max;
-            DealAnimationStyle = DealAnimationStyle.CinematicFlip;
             _loaded = true;
             return;
         }
@@ -44,13 +42,6 @@ public static class UiSettings
             (int)UiEffectsIntensity.Low => UiEffectsIntensity.Low,
             (int)UiEffectsIntensity.Normal => UiEffectsIntensity.Normal,
             _ => UiEffectsIntensity.Max
-        };
-
-        var rawDealStyle = config.GetValue("ui", "deal_animation_style", (int)DealAnimationStyle.CinematicFlip).AsInt32();
-        DealAnimationStyle = rawDealStyle switch
-        {
-            (int)DealAnimationStyle.Smooth => DealAnimationStyle.Smooth,
-            _ => DealAnimationStyle.CinematicFlip
         };
 
         _loaded = true;
@@ -74,12 +65,6 @@ public static class UiSettings
         EffectsIntensity = intensity;
     }
 
-    public static void SetDealAnimationStyle(DealAnimationStyle style)
-    {
-        EnsureLoaded();
-        DealAnimationStyle = style;
-    }
-
     public static void Save()
     {
         EnsureLoaded();
@@ -90,7 +75,6 @@ public static class UiSettings
         config.SetValue("ui", "reduce_motion", ReduceMotion);
         config.SetValue("ui", "sfx_enabled", UiSfxEnabled);
         config.SetValue("ui", "effects_intensity", (int)EffectsIntensity);
-        config.SetValue("ui", "deal_animation_style", (int)DealAnimationStyle);
 
         config.Save(SettingsPath);
     }
