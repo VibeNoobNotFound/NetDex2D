@@ -80,6 +80,17 @@ src/project.godot
 
 ## Release process (GitHub Releases)
 
+Automated release workflow:
+
+- Workflow file: `.github/workflows/release.yml`
+- Auto trigger: push to `main` when the head commit message includes both footers:
+  - `Release: vMAJOR.MINOR.PATCH` or `Release: vMAJOR.MINOR.PATCH-suffix`
+  - `Release-Type: prerelease` or `Release-Type: release`
+- Manual trigger: GitHub Actions `Release` workflow via `workflow_dispatch` with:
+  - `tag`
+  - `release_type`
+  - `target_ref`
+
 Expected release assets:
 
 - `netdex-macos-universal.zip`
@@ -94,6 +105,10 @@ Useful scripts:
 bash src/tools/release/package_release.sh
 bash src/tools/release/verify_release_assets.sh <owner> <repo>
 ```
+
+CI note:
+
+- Android export is currently forced to unsigned inside CI (`package/signed=false`) so the pipeline can publish cross-platform artifacts without keystore secrets.
 
 ## Documentation
 
