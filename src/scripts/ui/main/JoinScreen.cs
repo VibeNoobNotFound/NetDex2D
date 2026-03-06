@@ -184,6 +184,8 @@ public partial class JoinScreen : Control
             ShakeControl(_mainPanel);
             return;
         }
+        
+        UiFeedbackService.Instance?.SetLoading(false);
 
         SetStatus($"Connecting to {room.RoomName}...", notify: false);
     }
