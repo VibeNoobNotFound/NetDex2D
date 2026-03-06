@@ -181,8 +181,7 @@ jobs:
           sed -i 's/^codesign\/codesign=3$/codesign\/codesign=0/' src/export_presets.cfg
           grep -q '^codesign/codesign=0$' src/export_presets.cfg
 
-      - name: Export game
-        id: export
+      - name: Export macOS
         uses: firebelley/godot-export@v7.0.0
         with:
           godot_executable_download_url: https://downloads.godotengine.org/?flavor=stable&platform=linux.64&slug=mono_linux_x86_64.zip&version=4.6.1
@@ -191,7 +190,89 @@ jobs:
           use_preset_export_path: true
           archive_output: false
           cache: true
-          verbose: true
+          verbose: false
+          presets_to_export: macOS
+
+      - name: Export Windows x86_64
+        uses: firebelley/godot-export@v7.0.0
+        with:
+          godot_executable_download_url: https://downloads.godotengine.org/?flavor=stable&platform=linux.64&slug=mono_linux_x86_64.zip&version=4.6.1
+          godot_export_templates_download_url: https://downloads.godotengine.org/?flavor=stable&platform=templates&slug=mono_export_templates.tpz&version=4.6.1
+          relative_project_path: ./src
+          use_preset_export_path: true
+          archive_output: false
+          cache: true
+          verbose: false
+          presets_to_export: Windows Desktop (x86_64)
+
+      - name: Export Windows ARM64 (attempt 1)
+        id: export_win_arm64
+        continue-on-error: true
+        uses: firebelley/godot-export@v7.0.0
+        with:
+          godot_executable_download_url: https://downloads.godotengine.org/?flavor=stable&platform=linux.64&slug=mono_linux_x86_64.zip&version=4.6.1
+          godot_export_templates_download_url: https://downloads.godotengine.org/?flavor=stable&platform=templates&slug=mono_export_templates.tpz&version=4.6.1
+          relative_project_path: ./src
+          use_preset_export_path: true
+          archive_output: false
+          cache: true
+          verbose: false
+          presets_to_export: Windows Desktop (ARM64)
+
+      - name: Export Windows ARM64 (attempt 2)
+        id: export_win_arm64_retry
+        if: steps.export_win_arm64.outcome == 'failure'
+        uses: firebelley/godot-export@v7.0.0
+        with:
+          godot_executable_download_url: https://downloads.godotengine.org/?flavor=stable&platform=linux.64&slug=mono_linux_x86_64.zip&version=4.6.1
+          godot_export_templates_download_url: https://downloads.godotengine.org/?flavor=stable&platform=templates&slug=mono_export_templates.tpz&version=4.6.1
+          relative_project_path: ./src
+          use_preset_export_path: true
+          archive_output: false
+          cache: true
+          verbose: false
+          presets_to_export: Windows Desktop (ARM64)
+
+      - name: Fail if Windows ARM64 export failed twice
+        if: steps.export_win_arm64.outcome == 'failure' && steps.export_win_arm64_retry.outcome != 'success'
+        run: |
+          echo "::error::Windows ARM64 export failed after retry."
+          exit 1
+
+      - name: Export Linux x86_64
+        uses: firebelley/godot-export@v7.0.0
+        with:
+          godot_executable_download_url: https://downloads.godotengine.org/?flavor=stable&platform=linux.64&slug=mono_linux_x86_64.zip&version=4.6.1
+          godot_export_templates_download_url: https://downloads.godotengine.org/?flavor=stable&platform=templates&slug=mono_export_templates.tpz&version=4.6.1
+          relative_project_path: ./src
+          use_preset_export_path: true
+          archive_output: false
+          cache: true
+          verbose: false
+          presets_to_export: Linux x86_64
+
+      - name: Export Android
+        uses: firebelley/godot-export@v7.0.0
+        with:
+          godot_executable_download_url: https://downloads.godotengine.org/?flavor=stable&platform=linux.64&slug=mono_linux_x86_64.zip&version=4.6.1
+          godot_export_templates_download_url: https://downloads.godotengine.org/?flavor=stable&platform=templates&slug=mono_export_templates.tpz&version=4.6.1
+          relative_project_path: ./src
+          use_preset_export_path: true
+          archive_output: false
+          cache: true
+          verbose: false
+          presets_to_export: Android
+
+      - name: Log Godot build output tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Listing ~/.local/share/godot/builds"
+          if [[ -d "${HOME}/.local/share/godot/builds" ]]; then
+            find "${HOME}/.local/share/godot/builds" -maxdepth 5 -print
+          else
+            echo "No build directory at ${HOME}/.local/share/godot/builds"
+          fi
 
       - name: Collect release artifacts
         id: package
@@ -203,7 +284,7 @@ jobs:
           rm -rf "${artifacts_dir}"
           mkdir -p "${artifacts_dir}"
 
-          build_dir="${{ steps.export.outputs.build_directory }}"
+          build_dir="${HOME}/.local/share/godot/builds"
           search_roots=(
             "${GITHUB_WORKSPACE}/Publish"
             "${GITHUB_WORKSPACE}/src/Publish"
