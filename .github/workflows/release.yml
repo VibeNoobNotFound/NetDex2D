@@ -1,0 +1,229 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (example: v1.6.0 or v1.6.0-beta.1)"
+        required: true
+        type: string
+      release_type:
+        description: "Release channel"
+        required: true
+        default: prerelease
+        type: choice
+        options:
+          - prerelease
+          - release
+      target_ref:
+        description: "Branch, tag, or commit SHA to release"
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  preflight:
+    name: Resolve Release Metadata
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.meta.outputs.should_release }}
+      release_tag: ${{ steps.meta.outputs.release_tag }}
+      release_type: ${{ steps.meta.outputs.release_type }}
+      target_ref: ${{ steps.meta.outputs.target_ref }}
+      target_sha: ${{ steps.meta.outputs.target_sha }}
+      release_name: ${{ steps.meta.outputs.release_name }}
+      is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
+      make_latest: ${{ steps.meta.outputs.make_latest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve metadata
+        id: meta
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_TAG: ${{ github.event.inputs.tag }}
+          DISPATCH_RELEASE_TYPE: ${{ github.event.inputs.release_type }}
+          DISPATCH_TARGET_REF: ${{ github.event.inputs.target_ref }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          should_release="false"
+          release_tag=""
+          release_type=""
+          target_ref="${GITHUB_SHA}"
+          target_sha="${GITHUB_SHA}"
+          release_name=""
+          is_prerelease="false"
+          make_latest="false"
+
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            should_release="true"
+            release_tag="$(printf '%s' "${DISPATCH_TAG}" | xargs)"
+            release_type="$(printf '%s' "${DISPATCH_RELEASE_TYPE}" | tr '[:upper:]' '[:lower:]' | xargs)"
+            target_ref="$(printf '%s' "${DISPATCH_TARGET_REF:-${REF_NAME}}" | xargs)"
+          else
+            commit_message="$(git log -1 --pretty=%B "${GITHUB_SHA}")"
+            release_tag="$(printf '%s\n' "${commit_message}" | sed -nE 's/^[Rr]elease:[[:space:]]*(.+)[[:space:]]*$/\1/p' | tail -n1 | xargs)"
+            release_type="$(printf '%s\n' "${commit_message}" | sed -nE 's/^[Rr]elease-[Tt]ype:[[:space:]]*(.+)[[:space:]]*$/\1/p' | tail -n1 | tr '[:upper:]' '[:lower:]' | xargs)"
+
+            if [[ -z "${release_tag}" && -z "${release_type}" ]]; then
+              echo "No release footers found in head commit. Skipping release publish."
+            else
+              if [[ -z "${release_tag}" || -z "${release_type}" ]]; then
+                echo "::error::Malformed release footers. Expected both 'Release: <tag>' and 'Release-Type: prerelease|release'."
+                exit 1
+              fi
+              should_release="true"
+            fi
+          fi
+
+          if [[ "${should_release}" == "true" ]]; then
+            if [[ ! "${release_tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]]; then
+              echo "::error::Invalid release tag '${release_tag}'. Expected vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-suffix."
+              exit 1
+            fi
+
+            if [[ "${release_type}" != "prerelease" && "${release_type}" != "release" ]]; then
+              echo "::error::Invalid release type '${release_type}'. Expected 'prerelease' or 'release'."
+              exit 1
+            fi
+
+            target_sha="$(git rev-parse "${target_ref}^{commit}")"
+            git fetch --tags --force
+            existing_tag_sha="$(git rev-list -n 1 "refs/tags/${release_tag}" 2>/dev/null || true)"
+            if [[ -n "${existing_tag_sha}" && "${existing_tag_sha}" != "${target_sha}" ]]; then
+              echo "::error::Tag '${release_tag}' already exists at ${existing_tag_sha}, not ${target_sha}."
+              exit 1
+            fi
+
+            release_name="NetDex ${release_tag}"
+            if [[ "${release_type}" == "prerelease" ]]; then
+              is_prerelease="true"
+              make_latest="false"
+            else
+              is_prerelease="false"
+              make_latest="true"
+            fi
+          else
+            target_sha="$(git rev-parse "${target_ref}^{commit}")"
+          fi
+
+          {
+            echo "should_release=${should_release}"
+            echo "release_tag=${release_tag}"
+            echo "release_type=${release_type}"
+            echo "target_ref=${target_ref}"
+            echo "target_sha=${target_sha}"
+            echo "release_name=${release_name}"
+            echo "is_prerelease=${is_prerelease}"
+            echo "make_latest=${make_latest}"
+          } >> "${GITHUB_OUTPUT}"
+
+  export-and-publish:
+    name: Export and Publish
+    needs: preflight
+    if: needs.preflight.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.preflight.outputs.target_sha }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Build solution
+        run: dotnet build src/NetDex.sln --configuration Release
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Validate Android export permissions
+        run: bash src/tools/check_android_export_permissions.sh src/export_presets.cfg
+
+      - name: Force unsigned Android package in CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! grep -q '^package/signed=true$' src/export_presets.cfg; then
+            echo "::error::Expected package/signed=true in export preset."
+            exit 1
+          fi
+          sed -i 's/^package\/signed=true$/package\/signed=false/' src/export_presets.cfg
+          grep -q '^package/signed=false$' src/export_presets.cfg
+
+      - name: Export game
+        id: export
+        uses: firebelley/godot-export@v7.0.0
+        with:
+          godot_executable_download_url: https://downloads.godotengine.org/?flavor=stable&platform=linux.64&slug=mono_linux_x86_64.zip&version=4.6.1
+          godot_export_templates_download_url: https://downloads.godotengine.org/?flavor=stable&platform=templates&slug=mono_export_templates.tpz&version=4.6.1
+          relative_project_path: ./src
+          use_preset_export_path: true
+          archive_output: false
+          cache: true
+          verbose: true
+
+      - name: Collect release artifacts
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          publish_dir="${GITHUB_WORKSPACE}/Publish"
+          if [[ ! -d "${publish_dir}" ]]; then
+            echo "::error::Publish directory not found at ${publish_dir}."
+            echo "Export build directory: '${{ steps.export.outputs.build_directory }}'"
+            exit 1
+          fi
+
+          artifacts_dir="${RUNNER_TEMP}/release-artifacts"
+          rm -rf "${artifacts_dir}"
+          mkdir -p "${artifacts_dir}"
+
+          cp "${publish_dir}/MacOS/NetDex.zip" "${artifacts_dir}/netdex-macos-universal.zip"
+          cp "${publish_dir}/Windows/x86/NetDex.zip" "${artifacts_dir}/netdex-windows-x86_64.zip"
+          cp "${publish_dir}/Windows/arm/NetDex.zip" "${artifacts_dir}/netdex-windows-arm64.zip"
+          cp "${publish_dir}/Linux/NetDex.zip" "${artifacts_dir}/netdex-linux-x64.zip"
+          cp "${publish_dir}/Android/NetDex.apk" "${artifacts_dir}/netdex-android-arm64.apk"
+
+          ls -lah "${artifacts_dir}"
+          echo "artifacts_dir=${artifacts_dir}" >> "${GITHUB_OUTPUT}"
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.preflight.outputs.release_tag }}
+          target_commitish: ${{ needs.preflight.outputs.target_sha }}
+          name: ${{ needs.preflight.outputs.release_name }}
+          prerelease: ${{ needs.preflight.outputs.is_prerelease }}
+          make_latest: ${{ needs.preflight.outputs.make_latest }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            ${{ steps.package.outputs.artifacts_dir }}/netdex-macos-universal.zip
+            ${{ steps.package.outputs.artifacts_dir }}/netdex-windows-x86_64.zip
+            ${{ steps.package.outputs.artifacts_dir }}/netdex-windows-arm64.zip
+            ${{ steps.package.outputs.artifacts_dir }}/netdex-linux-x64.zip
+            ${{ steps.package.outputs.artifacts_dir }}/netdex-android-arm64.apk

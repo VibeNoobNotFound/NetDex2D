@@ -25,7 +25,8 @@ public partial class UpdateManager : Node
     private const string WindowsX86_64AssetName = "netdex-windows-x86_64.zip";
     private const string WindowsX64LegacyAssetName = "netdex-windows-x64.zip";
     private const string WindowsArm64AssetName = "netdex-windows-arm64.zip";
-    private const string LinuxAssetName = "netdex-linux-x86_64.zip";
+    private const string LinuxAssetName = "netdex-linux-x64.zip";
+    private const string LinuxLegacyAssetName = "netdex-linux-x86_64.zip";
     private const string AndroidAssetName = "netdex-android-arm64.apk";
 
     private const double AutoCheckIntervalSeconds = 6 * 60 * 60;
@@ -305,7 +306,7 @@ public partial class UpdateManager : Node
 
         if (platform == UpdatePlatform.Linux)
         {
-            return FindAssetByName(release, LinuxAssetName);
+            return FindAssetByNames(release, LinuxAssetName, LinuxLegacyAssetName);
         }
 
         if (platform == UpdatePlatform.Android)
