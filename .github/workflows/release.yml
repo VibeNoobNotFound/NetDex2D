@@ -162,16 +162,24 @@ jobs:
       - name: Validate Android export permissions
         run: bash src/tools/check_android_export_permissions.sh src/export_presets.cfg
 
-      - name: Force unsigned Android package in CI
+      - name: Normalize signing settings for CI exports
         shell: bash
         run: |
           set -euo pipefail
+
           if ! grep -q '^package/signed=true$' src/export_presets.cfg; then
             echo "::error::Expected package/signed=true in export preset."
             exit 1
           fi
           sed -i 's/^package\/signed=true$/package\/signed=false/' src/export_presets.cfg
           grep -q '^package/signed=false$' src/export_presets.cfg
+
+          # Linux runners do not provide Xcode tooling. Disable macOS code signing for CI export.
+          if ! grep -q '^codesign/codesign=3$' src/export_presets.cfg; then
+            echo "::warning::Expected codesign/codesign=3 in macOS preset; continuing with best-effort override."
+          fi
+          sed -i 's/^codesign\/codesign=3$/codesign\/codesign=0/' src/export_presets.cfg
+          grep -q '^codesign/codesign=0$' src/export_presets.cfg
 
       - name: Export game
         id: export
