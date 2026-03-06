@@ -199,22 +199,118 @@ jobs:
         run: |
           set -euo pipefail
 
-          publish_dir="${GITHUB_WORKSPACE}/Publish"
-          if [[ ! -d "${publish_dir}" ]]; then
-            echo "::error::Publish directory not found at ${publish_dir}."
-            echo "Export build directory: '${{ steps.export.outputs.build_directory }}'"
-            exit 1
-          fi
-
           artifacts_dir="${RUNNER_TEMP}/release-artifacts"
           rm -rf "${artifacts_dir}"
           mkdir -p "${artifacts_dir}"
 
-          cp "${publish_dir}/MacOS/NetDex.zip" "${artifacts_dir}/netdex-macos-universal.zip"
-          cp "${publish_dir}/Windows/x86/NetDex.zip" "${artifacts_dir}/netdex-windows-x86_64.zip"
-          cp "${publish_dir}/Windows/arm/NetDex.zip" "${artifacts_dir}/netdex-windows-arm64.zip"
-          cp "${publish_dir}/Linux/NetDex.zip" "${artifacts_dir}/netdex-linux-x64.zip"
-          cp "${publish_dir}/Android/NetDex.apk" "${artifacts_dir}/netdex-android-arm64.apk"
+          build_dir="${{ steps.export.outputs.build_directory }}"
+          search_roots=(
+            "${GITHUB_WORKSPACE}/Publish"
+            "${GITHUB_WORKSPACE}/src/Publish"
+            "${build_dir}"
+            "${GITHUB_WORKSPACE}"
+          )
+
+          resolve_file_by_relpath() {
+            local relpath="$1"
+            local root
+            for root in "${search_roots[@]}"; do
+              [[ -d "${root}" ]] || continue
+              if [[ -f "${root}/${relpath}" ]]; then
+                echo "${root}/${relpath}"
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          find_file_by_path_glob() {
+            local glob="$1"
+            local root
+            for root in "${search_roots[@]}"; do
+              [[ -d "${root}" ]] || continue
+              local hit
+              hit="$(find "${root}" -type f -path "${glob}" | head -n1 || true)"
+              if [[ -n "${hit}" ]]; then
+                echo "${hit}"
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          find_dir_by_path_glob() {
+            local glob="$1"
+            local root
+            for root in "${search_roots[@]}"; do
+              [[ -d "${root}" ]] || continue
+              local hit
+              hit="$(find "${root}" -type d -path "${glob}" | head -n1 || true)"
+              if [[ -n "${hit}" ]]; then
+                echo "${hit}"
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          echo "Artifact discovery roots:"
+          printf '  - %s\n' "${search_roots[@]}"
+
+          mac_source="$(resolve_file_by_relpath "MacOS/NetDex.zip" || true)"
+          if [[ -z "${mac_source}" ]]; then
+            mac_source="$(find_file_by_path_glob "*/MacOS/NetDex.zip" || true)"
+          fi
+          if [[ -n "${mac_source}" ]]; then
+            cp "${mac_source}" "${artifacts_dir}/netdex-macos-universal.zip"
+          else
+            mac_app_dir="$(find_dir_by_path_glob "*/MacOS/NetDex.app" || true)"
+            if [[ -z "${mac_app_dir}" ]]; then
+              echo "::error::Unable to locate macOS export output (NetDex.zip or NetDex.app)."
+              exit 1
+            fi
+            (cd "$(dirname "${mac_app_dir}")" && zip -r -q "${artifacts_dir}/netdex-macos-universal.zip" "$(basename "${mac_app_dir}")")
+          fi
+
+          win_x86_source="$(resolve_file_by_relpath "Windows/x86/NetDex.zip" || true)"
+          if [[ -z "${win_x86_source}" ]]; then
+            win_x86_source="$(find_file_by_path_glob "*/Windows/x86/NetDex.zip" || true)"
+          fi
+          if [[ -z "${win_x86_source}" ]]; then
+            echo "::error::Unable to locate Windows x86_64 export output."
+            exit 1
+          fi
+          cp "${win_x86_source}" "${artifacts_dir}/netdex-windows-x86_64.zip"
+
+          win_arm_source="$(resolve_file_by_relpath "Windows/arm/NetDex.zip" || true)"
+          if [[ -z "${win_arm_source}" ]]; then
+            win_arm_source="$(find_file_by_path_glob "*/Windows/arm/NetDex.zip" || true)"
+          fi
+          if [[ -z "${win_arm_source}" ]]; then
+            echo "::error::Unable to locate Windows ARM64 export output."
+            exit 1
+          fi
+          cp "${win_arm_source}" "${artifacts_dir}/netdex-windows-arm64.zip"
+
+          linux_source="$(resolve_file_by_relpath "Linux/NetDex.zip" || true)"
+          if [[ -z "${linux_source}" ]]; then
+            linux_source="$(find_file_by_path_glob "*/Linux/NetDex.zip" || true)"
+          fi
+          if [[ -z "${linux_source}" ]]; then
+            echo "::error::Unable to locate Linux export output."
+            exit 1
+          fi
+          cp "${linux_source}" "${artifacts_dir}/netdex-linux-x64.zip"
+
+          android_source="$(resolve_file_by_relpath "Android/NetDex.apk" || true)"
+          if [[ -z "${android_source}" ]]; then
+            android_source="$(find_file_by_path_glob "*/Android/NetDex.apk" || true)"
+          fi
+          if [[ -z "${android_source}" ]]; then
+            echo "::error::Unable to locate Android export output."
+            exit 1
+          fi
+          cp "${android_source}" "${artifacts_dir}/netdex-android-arm64.apk"
 
           ls -lah "${artifacts_dir}"
           echo "artifacts_dir=${artifacts_dir}" >> "${GITHUB_OUTPUT}"
