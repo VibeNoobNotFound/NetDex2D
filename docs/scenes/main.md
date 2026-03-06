@@ -14,6 +14,14 @@ This scene drives `Main` (`Control`) in the NetDex UI/game flow.
 |---|---|---|
 | `Main` | `Control` | `.` |
 | `GlobalBackground` | `TextureRect` | `.` |
+| `MainMenu` | `MainMenu` scene instance | `.` |
+| `HostScreen` | `HostScreen` scene instance | `.` |
+| `JoinScreen` | `JoinScreen` scene instance | `.` |
+| `LobbyScreen` | `LobbyScreen` scene instance | `.` |
+| `GameScreen` | `GameScreen` scene instance | `.` |
+| `SettingsMenu` | `SettingsMenu` scene instance | `.` |
+| `AboutScreen` | `AboutScreen` scene instance | `.` |
+| `HelpScreen` | `HelpScreen` scene instance | `.` |
 
 ## User interactions
 

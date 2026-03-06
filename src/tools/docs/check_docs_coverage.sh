@@ -31,6 +31,7 @@ scene_map = {
     'src/scenes/ui/LobbyScreen.tscn': 'docs/scenes/ui-lobby.md',
     'src/scenes/ui/SettingsMenu.tscn': 'docs/scenes/ui-settings.md',
     'src/scenes/ui/AboutScreen.tscn': 'docs/scenes/ui-about.md',
+    'src/scenes/ui/HelpScreen.tscn': 'docs/scenes/ui-help.md',
     'src/scenes/ui/PauseMenu.tscn': 'docs/scenes/ui-pause.md',
     'src/scenes/game/GameScreen.tscn': 'docs/scenes/game-screen.md',
     'src/scenes/game/Card.tscn': 'docs/scenes/game-card.md',

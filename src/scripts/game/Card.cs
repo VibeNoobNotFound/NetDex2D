@@ -1,4 +1,6 @@
+using System;
 using Godot;
+using NetDex.UI.Polish;
 
 namespace NetDex.UI.Game;
 
@@ -16,6 +18,10 @@ public partial class Card : Control
     [Signal]
     public delegate void CardClickedEventHandler(Card card);
 
+    [Signal]
+    public delegate void CardSelectedEventHandler(Card card);
+
+    private Control _visualRoot = null!;
     private TextureRect _textureRect = null!;
 
     private static Texture2D _cardSheet = null!;
@@ -24,17 +30,38 @@ public partial class Card : Control
     private const int CardWidth = 140;
     private const int CardHeight = 190;
 
+    private bool _isHovered;
+    private bool _isSelected;
+    private bool _isMobile;
+    private Tween? _motionTween;
+
     public override void _Ready()
     {
-        _textureRect = GetNode<TextureRect>("TextureRect");
+        _visualRoot = GetNode<Control>("VisualRoot");
+        _textureRect = GetNode<TextureRect>("VisualRoot/TextureRect");
 
         _cardSheet ??= GD.Load<Texture2D>("res://assets/spritesheets/playingCards.png");
         _backSheet ??= GD.Load<Texture2D>("res://assets/spritesheets/playingCardBacks.png");
 
+        _isMobile = OS.HasFeature("android") || OS.HasFeature("ios");
+
         GuiInput += OnGuiInput;
         MouseEntered += OnMouseEntered;
         MouseExited += OnMouseExited;
+
+        if (GetParent() is Container)
+        {
+            Set("layout_mode", 2);
+        }
+
+        PivotOffset = Size * 0.5f;
+        if (PivotOffset == Vector2.Zero)
+        {
+            PivotOffset = CustomMinimumSize * 0.5f;
+        }
+
         UpdateVisuals();
+        UpdateMotionState();
     }
 
     public void Setup(SuitType suit, RankType rank, bool isFaceUp = false, string cardId = "")
@@ -59,6 +86,23 @@ public partial class Card : Control
     public void SetInteractable(bool interactable)
     {
         IsInteractable = interactable;
+        if (!interactable)
+        {
+            _isHovered = false;
+            _isSelected = false;
+            UpdateMotionState();
+        }
+    }
+
+    public void SetSelected(bool selected)
+    {
+        if (_isSelected == selected)
+        {
+            return;
+        }
+
+        _isSelected = selected;
+        UpdateMotionState();
     }
 
     private void UpdateVisuals()
@@ -88,6 +132,30 @@ public partial class Card : Control
 
             _textureRect.Texture = atlas;
         }
+    }
+
+    private void UpdateMotionState()
+    {
+        if (!IsInsideTree() || _visualRoot == null)
+        {
+            return;
+        }
+
+        var shouldLift = _isHovered || _isSelected;
+        var duration = (float)Math.Max(0.12, UiMotionProfile.MicroDurationSeconds * 1.7);
+        var targetLiftY = shouldLift ? -10f : 0f;
+        var targetTint = _isSelected ? new Color(1f, 0.98f, 0.9f, 1f) : Colors.White;
+        ZIndex = shouldLift ? 50 : 0;
+
+        _motionTween?.Kill();
+        _motionTween = CreateTween();
+        _motionTween.SetParallel(true);
+        _motionTween.TweenProperty(_visualRoot, "position:y", targetLiftY, duration)
+            .SetTrans(Tween.TransitionType.Sine)
+            .SetEase(Tween.EaseType.InOut);
+        _motionTween.TweenProperty(this, "modulate", targetTint, duration)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
     }
 
     private static Rect2 GetCardRegion(SuitType suit, RankType rank)
@@ -159,10 +227,28 @@ public partial class Card : Control
             return;
         }
 
-        if (@event is InputEventMouseButton mouseEvent && mouseEvent.Pressed && mouseEvent.ButtonIndex == MouseButton.Left)
+        if (@event is not InputEventMouseButton mouseEvent || !mouseEvent.Pressed || mouseEvent.ButtonIndex != MouseButton.Left)
         {
-            EmitSignal(SignalName.CardClicked, this);
+            return;
         }
+
+        if (_isMobile)
+        {
+            if (!_isSelected)
+            {
+                _isSelected = true;
+                UpdateMotionState();
+                EmitSignal(SignalName.CardSelected, this);
+                return;
+            }
+
+            _isSelected = false;
+            UpdateMotionState();
+            EmitSignal(SignalName.CardClicked, this);
+            return;
+        }
+
+        EmitSignal(SignalName.CardClicked, this);
     }
 
     private void OnMouseEntered()
@@ -172,7 +258,8 @@ public partial class Card : Control
             return;
         }
 
-        Position -= new Vector2(0, 10);
+        _isHovered = true;
+        UpdateMotionState();
     }
 
     private void OnMouseExited()
@@ -182,6 +269,7 @@ public partial class Card : Control
             return;
         }
 
-        Position += new Vector2(0, 10);
+        _isHovered = false;
+        UpdateMotionState();
     }
 }

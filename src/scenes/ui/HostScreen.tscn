@@ -12,15 +12,6 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_host")
 
-[node name="Background" type="ColorRect" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.04, 0.03, 0.03, 0.46)
-
 [node name="ScrollContainer" type="ScrollContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -34,19 +25,20 @@ script = ExtResource("2_scroll")
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_constants/margin_left = 16
+theme_override_constants/margin_left = 20
 theme_override_constants/margin_top = 20
-theme_override_constants/margin_right = 16
+theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 20
 
-[node name="CenterContainer" type="CenterContainer" parent="ScrollContainer/MarginContainer"]
+[node name="CenterContainer" type="MarginContainer" parent="ScrollContainer/MarginContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
 [node name="MainPanel" type="PanelContainer" parent="ScrollContainer/MarginContainer/CenterContainer"]
 layout_mode = 2
-custom_minimum_size = Vector2(360, 460)
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 500)
 
 [node name="VBoxContainer" type="VBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel"]
 layout_mode = 2
@@ -58,9 +50,19 @@ theme_override_font_sizes/font_size = 36
 text = "Host Room"
 horizontal_alignment = 1
 
+[node name="IdentityLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Identity"
+
 [node name="PlayerNameInput" type="LineEdit" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 layout_mode = 2
 placeholder_text = "Player Name"
+
+[node name="RoomLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Room"
 
 [node name="RoomNameInput" type="LineEdit" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 layout_mode = 2
@@ -84,5 +86,6 @@ text = "Back"
 
 [node name="StatusLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
 layout_mode = 2
-text = "Ready"
+theme_override_font_sizes/font_size = 16
+text = "Enter player and room details."
 autowrap_mode = 2

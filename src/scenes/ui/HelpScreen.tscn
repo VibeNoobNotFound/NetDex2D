@@ -1,0 +1,307 @@
+[gd_scene format=3 uid="uid://d7q8tmi4v6h0g"]
+
+[ext_resource type="Script" path="res://scripts/ui/HelpScreen.cs" id="1_help"]
+
+[node name="HelpScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_help")
+
+[node name="ScrollContainer" type="ScrollContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+follow_focus = true
+vertical_scroll_mode = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="CenterContainer" type="MarginContainer" parent="ScrollContainer/MarginContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="MainPanel" type="PanelContainer" parent="ScrollContainer/MarginContainer/CenterContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 940)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TitleLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+text = "How to Play"
+horizontal_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+text = "Learn quickly with guided steps and live card simulation"
+horizontal_alignment = 1
+
+[node name="SectionSelectorPanel" type="PanelContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="SectionSelectorMargin" type="MarginContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/SectionSelectorPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="SectionSelectorRow" type="HBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/SectionSelectorPanel/SectionSelectorMargin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AppSectionButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/SectionSelectorPanel/SectionSelectorMargin/SectionSelectorRow"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "App & Controls"
+
+[node name="OmiSectionButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/SectionSelectorPanel/SectionSelectorMargin/SectionSelectorRow"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "How Omi Works"
+
+[node name="AppSection" type="VBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="AppStepSelectorRow" type="HBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AppStepLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection/AppStepSelectorRow"]
+layout_mode = 2
+text = "Lesson"
+vertical_alignment = 1
+
+[node name="AppStepOption" type="OptionButton" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection/AppStepSelectorRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="AppStepTitleLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Step title"
+
+[node name="AppContentPanel" type="PanelContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection"]
+layout_mode = 2
+
+[node name="AppContentMargin" type="MarginContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection/AppContentPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="AppContentVBox" type="VBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection/AppContentPanel/AppContentMargin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AppBodyRichText" type="RichTextLabel" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection/AppContentPanel/AppContentMargin/AppContentVBox"]
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+selection_enabled = true
+
+[node name="AppTakeawayLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection/AppContentPanel/AppContentMargin/AppContentVBox"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="AppNoteLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection/AppContentPanel/AppContentMargin/AppContentVBox"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="AppProgressRow" type="HBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AppProgressBar" type="ProgressBar" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection/AppProgressRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 8.0
+value = 0.0
+show_percentage = false
+
+[node name="AppProgressLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection/AppProgressRow"]
+layout_mode = 2
+text = "0/8 completed"
+vertical_alignment = 1
+
+[node name="AppNavigationRow" type="HBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AppPrevButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection/AppNavigationRow"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Previous"
+
+[node name="AppNextButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/AppSection/AppNavigationRow"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Next"
+
+[node name="OmiSection" type="VBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="OmiStepSelectorRow" type="HBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="OmiStepLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiStepSelectorRow"]
+layout_mode = 2
+text = "Lesson"
+vertical_alignment = 1
+
+[node name="OmiStepOption" type="OptionButton" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiStepSelectorRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="OmiStepTitleLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Step title"
+
+[node name="OmiContentPanel" type="PanelContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection"]
+layout_mode = 2
+
+[node name="OmiContentMargin" type="MarginContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiContentPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="OmiContentVBox" type="VBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiContentPanel/OmiContentMargin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="OmiBodyRichText" type="RichTextLabel" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiContentPanel/OmiContentMargin/OmiContentVBox"]
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+selection_enabled = true
+
+[node name="OmiTakeawayLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiContentPanel/OmiContentMargin/OmiContentVBox"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="OmiNoteLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiContentPanel/OmiContentMargin/OmiContentVBox"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="OmiSimulatorPanel" type="PanelContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection"]
+layout_mode = 2
+
+[node name="OmiSimulatorMargin" type="MarginContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiSimulatorPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="OmiSimulatorVBox" type="VBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiSimulatorPanel/OmiSimulatorMargin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SimulatorTitleLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiSimulatorPanel/OmiSimulatorMargin/OmiSimulatorVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Live Trick Simulator"
+
+[node name="SimulatorHintLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiSimulatorPanel/OmiSimulatorMargin/OmiSimulatorVBox"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Hint"
+
+[node name="CurrentTrickLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiSimulatorPanel/OmiSimulatorMargin/OmiSimulatorVBox"]
+layout_mode = 2
+text = "Current Trick"
+
+[node name="CurrentTrickRow" type="HBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiSimulatorPanel/OmiSimulatorMargin/OmiSimulatorVBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="YourHandLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiSimulatorPanel/OmiSimulatorMargin/OmiSimulatorVBox"]
+layout_mode = 2
+text = "Your Hand (tap/click a card)"
+
+[node name="YourHandRow" type="HBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiSimulatorPanel/OmiSimulatorMargin/OmiSimulatorVBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="SimulatorResultLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiSimulatorPanel/OmiSimulatorMargin/OmiSimulatorVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+autowrap_mode = 3
+text = "Result"
+
+[node name="OmiProgressRow" type="HBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="OmiProgressBar" type="ProgressBar" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiProgressRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 8.0
+value = 0.0
+show_percentage = false
+
+[node name="OmiProgressLabel" type="Label" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiProgressRow"]
+layout_mode = 2
+text = "0/8 completed"
+vertical_alignment = 1
+
+[node name="OmiNavigationRow" type="HBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="OmiPrevButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiNavigationRow"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Previous"
+
+[node name="OmiNextButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/OmiSection/OmiNavigationRow"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Next"
+
+[node name="FooterRow" type="HBoxContainer" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BackButton" type="Button" parent="ScrollContainer/MarginContainer/CenterContainer/MainPanel/VBoxContainer/FooterRow"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Back"

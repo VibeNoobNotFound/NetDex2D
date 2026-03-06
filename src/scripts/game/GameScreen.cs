@@ -3,18 +3,20 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
-using NetDex.Core.Config;
 using NetDex.Core.Enums;
 using NetDex.Core.Models;
 using NetDex.Core.Serialization;
 using NetDex.Lobby;
 using NetDex.Managers;
 using NetDex.Networking;
+using NetDex.UI.Polish;
 
 namespace NetDex.UI.Game;
 
 public partial class GameScreen : Control
 {
+    private const int DealSourceDeckLayers = 8;
+
     private enum VisualSlot
     {
         Bottom = 0,
@@ -46,8 +48,15 @@ public partial class GameScreen : Control
     private Button _actionButton = null!;
     private Button _secondaryActionButton = null!;
     private Control _animationLayer = null!;
+    private Control _dealSourceAnchor = null!;
+    private Control _dealSourceStack = null!;
     private PanelContainer _trumpAnnouncementPanel = null!;
     private Label _trumpAnnouncementLabel = null!;
+    private PanelContainer _roundResultPanel = null!;
+    private Label _roundResultLabel = null!;
+    private PanelContainer _kapothiBannerPanel = null!;
+    private Label _kapothiBannerLabel = null!;
+    private ColorRect _focusVignette = null!;
 
     private PackedScene _cardScene = null!;
 
@@ -62,6 +71,7 @@ public partial class GameScreen : Control
     private readonly Dictionary<SeatPosition, Card> _deskCards = new();
     private readonly List<Card> _friendlyPileCards = new();
     private readonly List<Card> _enemyPileCards = new();
+    private readonly List<Card> _dealSourceDeckCards = new();
 
     private int _lastRoundNumber = -1;
     private int _lastCompletedTricksCount = -1;
@@ -72,7 +82,12 @@ public partial class GameScreen : Control
     private bool _isCollectingTrick;
     private bool _isDealAnimationRunning;
     private OmiPhase? _lastPhase;
+    private OmiPhase? _lastPhaseCue;
     private int _lastTrumpSuit = -1;
+    private int _lastRoundBannerShown = -1;
+    private SeatPosition? _lastTurnSeat;
+    private int _dealAnimationRunId;
+    private bool _suppressInitialDeskEntryAudio = true;
     private Godot.Collections.Dictionary _pendingSnapshot = new();
 
     public override void _Ready()
@@ -100,8 +115,19 @@ public partial class GameScreen : Control
         _actionButton = GetNode<Button>("ActionPanel/VBoxContainer/ActionButton");
         _secondaryActionButton = GetNode<Button>("ActionPanel/VBoxContainer/SecondaryActionButton");
         _animationLayer = GetNode<Control>("AnimationLayer");
+        _dealSourceAnchor = GetNode<Control>("AnimationLayer/DealSourceAnchor");
+        _dealSourceStack = GetNode<Control>("AnimationLayer/DealSourceAnchor/DealSourceStack");
         _trumpAnnouncementPanel = GetNode<PanelContainer>("AnimationLayer/TrumpAnnouncementPanel");
         _trumpAnnouncementLabel = GetNode<Label>("AnimationLayer/TrumpAnnouncementPanel/AnnouncementMargin/AnnouncementLabel");
+        _roundResultPanel = GetNode<PanelContainer>("AnimationLayer/RoundResultPanel");
+        _roundResultLabel = GetNode<Label>("AnimationLayer/RoundResultPanel/RoundResultMargin/RoundResultLabel");
+        _kapothiBannerPanel = GetNode<PanelContainer>("AnimationLayer/KapothiBannerPanel");
+        _kapothiBannerLabel = GetNode<Label>("AnimationLayer/KapothiBannerPanel/KapothiBannerMargin/KapothiBannerLabel");
+        _focusVignette = GetNode<ColorRect>("FocusVignette");
+        _dealSourceAnchor.Visible = false;
+        _roundResultPanel.Visible = false;
+        _kapothiBannerPanel.Visible = false;
+        ConfigureSeatLabelVisuals();
 
         GetNode<Button>("BackLobbyButton").Pressed += OnBackLobbyPressed;
         _mobilePauseButton.Visible = OS.HasFeature("android") || OS.HasFeature("ios");
@@ -116,6 +142,7 @@ public partial class GameScreen : Control
         _trumpOption.AddItem("Spades", (int)CardSuit.Spades);
 
         _cardScene = GD.Load<PackedScene>("res://scenes/game/Card.tscn");
+        BuildDealSourceDeckVisual();
 
         _placeSounds = new[]
         {
@@ -188,7 +215,9 @@ public partial class GameScreen : Control
             ResetBoardVisualState();
             _lastPhase = null;
             _lastTrumpSuit = -1;
+            _lastPhaseCue = null;
             _pendingSnapshot = new Godot.Collections.Dictionary();
+            _suppressInitialDeskEntryAudio = true;
             return;
         }
 
@@ -207,27 +236,35 @@ public partial class GameScreen : Control
 
         var teamCredits = ExtractPair(snapshot, "teamCredits", 10, 10);
         var teamTricks = ExtractPair(snapshot, "teamTricks", 0, 0);
+        UpdateSideHandLayout(snapshot);
         var pendingDrawBonus = snapshot.TryGetValue("pendingDrawBonusCredits", out var drawBonusVariant)
             ? drawBonusVariant.AsInt32()
             : 0;
         _statusLabel.Text = BuildStatusText(phase, roundNumber, currentTurnSeat, trumpSuit, teamCredits, teamTricks, pendingDrawBonus);
+        UpdateTurnSpotlight(currentTurnSeat, phase);
+        PlayPhaseCueIfNeeded(phase);
+        HandlePhaseVisualEvents(phase, roundNumber, teamCredits, teamTricks);
 
         TryStartPhaseAnimation(snapshot, phase, trumpSuit);
         if (_isDealAnimationRunning)
         {
             _pendingSnapshot = snapshot.Duplicate(true);
             RenderActionPanel(snapshot, phase);
-            _lastPhase = phase;
-            _lastTrumpSuit = trumpSuit;
             return;
         }
 
         ClearHands();
         RenderHands(snapshot, phase, currentTurnSeat);
-        RenderTrickState(snapshot, roundNumber, currentTurnSeat, teamTricks);
+        RenderTrickState(snapshot, roundNumber, currentTurnSeat, teamTricks, _suppressInitialDeskEntryAudio);
         RenderActionPanel(snapshot, phase);
+        if (_lastTurnSeat != currentTurnSeat)
+        {
+            PulseSeatLabel(currentTurnSeat);
+            _lastTurnSeat = currentTurnSeat;
+        }
         _lastPhase = phase;
         _lastTrumpSuit = trumpSuit;
+        _suppressInitialDeskEntryAudio = false;
     }
 
     private string BuildStatusText(OmiPhase phase, int roundNumber, SeatPosition currentTurnSeat, int trumpSuit, int[] teamCredits, int[] teamTricks, int pendingDrawBonus)
@@ -294,6 +331,475 @@ public partial class GameScreen : Control
             : null;
     }
 
+    private void ConfigureSeatLabelVisuals()
+    {
+        ConfigureSideSeatLabel(_leftPlayerName);
+        ConfigureSideSeatLabel(_rightPlayerName);
+        _leftPlayerName.ZIndex = 260;
+        _rightPlayerName.ZIndex = 260;
+    }
+
+    private static void ConfigureSideSeatLabel(Label label)
+    {
+        label.AutowrapMode = TextServer.AutowrapMode.Off;
+        label.Set("clip_text", true);
+        label.Set("text_overrun_behavior", 3);
+    }
+
+    private void UpdateSideHandLayout(Godot.Collections.Dictionary snapshot)
+    {
+        var handCounts = ReadHandCounts(snapshot);
+        var visibleHands = ReadVisibleHands(snapshot);
+        var counts = new Dictionary<SeatPosition, int>();
+
+        foreach (SeatPosition seat in Enum.GetValues(typeof(SeatPosition)))
+        {
+            var visibleCards = ReadVisibleCardsForSeat(visibleHands, seat);
+            counts[seat] = ResolveSeatHandCount(handCounts, seat, visibleCards.Count);
+        }
+
+        UpdateSideHandLayoutFromCounts(counts);
+    }
+
+    private void UpdateSideHandLayoutFromCounts(IDictionary<SeatPosition, int> counts)
+    {
+        var leftSeat = ToSeatForVisualSlot(VisualSlot.Left);
+        var rightSeat = ToSeatForVisualSlot(VisualSlot.Right);
+
+        var leftCount = counts.TryGetValue(leftSeat, out var resolvedLeftCount) ? resolvedLeftCount : _leftHand.GetChildCount();
+        var rightCount = counts.TryGetValue(rightSeat, out var resolvedRightCount) ? resolvedRightCount : _rightHand.GetChildCount();
+
+        ApplySideHandSeparation(_leftHand, leftCount);
+        ApplySideHandSeparation(_rightHand, rightCount);
+    }
+
+    private static void ApplySideHandSeparation(VBoxContainer container, int cardCount)
+    {
+        const float cardHeight = 95f;
+        const int defaultSeparation = -44;
+
+        if (cardCount <= 1)
+        {
+            container.AddThemeConstantOverride("separation", defaultSeparation);
+            return;
+        }
+
+        var measuredHeight = container.Size.Y > 2f ? container.Size.Y : container.GetGlobalRect().Size.Y;
+        if (measuredHeight <= 2f)
+        {
+            measuredHeight = 376f;
+        }
+
+        var availableHeight = Math.Max(cardHeight + 4f, measuredHeight - 6f);
+        var step = (availableHeight - cardHeight) / Math.Max(1, cardCount - 1);
+        step = (float)Math.Clamp(step, 30f, 52f);
+        var separation = (int)Math.Round(step - cardHeight);
+        container.AddThemeConstantOverride("separation", separation);
+    }
+
+    private static Godot.Collections.Dictionary ReadHandCounts(Godot.Collections.Dictionary snapshot)
+    {
+        return snapshot.TryGetValue("handCounts", out var handCountsVariant) && handCountsVariant.VariantType == Variant.Type.Dictionary
+            ? handCountsVariant.AsGodotDictionary()
+            : new Godot.Collections.Dictionary();
+    }
+
+    private static Godot.Collections.Dictionary ReadVisibleHands(Godot.Collections.Dictionary snapshot)
+    {
+        return snapshot.TryGetValue("visibleHands", out var visibleHandsVariant) && visibleHandsVariant.VariantType == Variant.Type.Dictionary
+            ? visibleHandsVariant.AsGodotDictionary()
+            : new Godot.Collections.Dictionary();
+    }
+
+    private static Godot.Collections.Array ReadVisibleCardsForSeat(Godot.Collections.Dictionary visibleHands, SeatPosition seat)
+    {
+        if (visibleHands.TryGetValue(seat.ToString(), out var cardsVariant) && cardsVariant.VariantType == Variant.Type.Array)
+        {
+            return cardsVariant.AsGodotArray();
+        }
+
+        return new Godot.Collections.Array();
+    }
+
+    private static int ResolveSeatHandCount(Godot.Collections.Dictionary handCounts, SeatPosition seat, int visibleCardsCount)
+    {
+        return handCounts.TryGetValue(seat.ToString(), out var countVariant)
+            ? countVariant.AsInt32()
+            : visibleCardsCount;
+    }
+
+    private Dictionary<SeatPosition, int> BuildCurrentHandCounts()
+    {
+        var counts = new Dictionary<SeatPosition, int>();
+        foreach (SeatPosition seat in Enum.GetValues(typeof(SeatPosition)))
+        {
+            counts[seat] = GetHandContainer(seat).GetChildCount();
+        }
+
+        return counts;
+    }
+
+    private Dictionary<SeatPosition, int> BuildTargetHandCounts(Godot.Collections.Dictionary snapshot)
+    {
+        var handCounts = ReadHandCounts(snapshot);
+        var visibleHands = ReadVisibleHands(snapshot);
+        var target = new Dictionary<SeatPosition, int>();
+
+        foreach (SeatPosition seat in Enum.GetValues(typeof(SeatPosition)))
+        {
+            var visibleCards = ReadVisibleCardsForSeat(visibleHands, seat);
+            target[seat] = ResolveSeatHandCount(handCounts, seat, visibleCards.Count);
+        }
+
+        return target;
+    }
+
+    private bool TryGetVisibleCardModel(Godot.Collections.Dictionary snapshot, SeatPosition seat, int index, out CardModel model)
+    {
+        var visibleHands = ReadVisibleHands(snapshot);
+        var visibleCards = ReadVisibleCardsForSeat(visibleHands, seat);
+        if (index < 0 || index >= visibleCards.Count)
+        {
+            model = default;
+            return false;
+        }
+
+        var item = visibleCards[index];
+        if (item.VariantType != Variant.Type.Dictionary)
+        {
+            model = default;
+            return false;
+        }
+
+        model = CardModelConversions.FromDictionary(item.AsGodotDictionary());
+        return true;
+    }
+
+    private bool ShouldRevealDealtCardFace(SeatPosition actualSeat)
+    {
+        return _localRole == ParticipantRole.Player && ToVisualSlot(actualSeat) == VisualSlot.Bottom;
+    }
+
+    private void EnsureDealBaselineCards(
+        Godot.Collections.Dictionary snapshot,
+        IReadOnlyDictionary<SeatPosition, int> targetCounts,
+        IDictionary<SeatPosition, int> currentCounts,
+        int baselineCount)
+    {
+        foreach (SeatPosition seat in Enum.GetValues(typeof(SeatPosition)))
+        {
+            if (!targetCounts.TryGetValue(seat, out var targetCount))
+            {
+                continue;
+            }
+
+            var desiredBaseline = Math.Min(targetCount, baselineCount);
+            while (currentCounts[seat] < desiredBaseline)
+            {
+                var index = currentCounts[seat];
+                CardModel? visibleModel = null;
+                if (ShouldRevealDealtCardFace(seat) && TryGetVisibleCardModel(snapshot, seat, index, out var resolvedVisibleCard))
+                {
+                    visibleModel = resolvedVisibleCard;
+                }
+
+                var model = visibleModel ?? new CardModel($"hidden-{seat}-{index}", CardSuit.Spades, CardRank.Ace);
+                var faceUp = visibleModel.HasValue;
+                GetHandContainer(seat).AddChild(CreateCard(model, faceUp, false));
+                currentCounts[seat] += 1;
+            }
+        }
+
+        UpdateSideHandLayoutFromCounts(currentCounts);
+    }
+
+    private void BuildDealSourceDeckVisual()
+    {
+        ClearContainer(_dealSourceStack);
+        _dealSourceDeckCards.Clear();
+
+        for (var i = 0; i < DealSourceDeckLayers; i++)
+        {
+            var card = CreateCard(new CardModel($"deal-source-{i}", CardSuit.Spades, CardRank.Ace), false, false);
+            card.MouseFilter = MouseFilterEnum.Ignore;
+            card.Scale = new Vector2(1.14f, 1.14f);
+            _dealSourceStack.AddChild(card);
+            _dealSourceDeckCards.Add(card);
+        }
+
+        for (var i = 0; i < _dealSourceDeckCards.Count; i++)
+        {
+            var card = _dealSourceDeckCards[i];
+            var depth = _dealSourceDeckCards.Count - 1 - i;
+            card.Position = new Vector2(depth * 1.8f, depth * 1.25f);
+            card.ZIndex = 20 + i;
+        }
+
+        SetDealSourceDeckRemaining(0);
+    }
+
+    private void SetDealSourceDeckRemaining(int remainingCards)
+    {
+        if (_dealSourceDeckCards.Count == 0)
+        {
+            return;
+        }
+
+        var visibleCount = (int)Math.Clamp(Math.Ceiling(remainingCards / 2.0), 0, _dealSourceDeckCards.Count);
+        for (var i = 0; i < _dealSourceDeckCards.Count; i++)
+        {
+            var card = _dealSourceDeckCards[i];
+            var visible = i < visibleCount;
+            card.Visible = visible;
+            if (!visible)
+            {
+                continue;
+            }
+
+            var alpha = 0.55f + 0.45f * (i / (float)Math.Max(1, visibleCount - 1));
+            card.Modulate = new Color(1f, 1f, 1f, alpha);
+        }
+    }
+
+    private void UpdateDealSourcePosition(SeatPosition shufflerSeat)
+    {
+        var sourceHand = GetHandContainer(shufflerSeat).GetGlobalRect();
+        var anchorSize = _dealSourceAnchor.Size;
+        if (anchorSize.X <= 2f || anchorSize.Y <= 2f)
+        {
+            anchorSize = new Vector2(100f, 130f);
+        }
+
+        var sourceCenter = sourceHand.Position + sourceHand.Size / 2f;
+        const float gap = 18f;
+        var targetPosition = sourceCenter - anchorSize / 2f;
+        switch (ToVisualSlot(shufflerSeat))
+        {
+            case VisualSlot.Bottom:
+                targetPosition = new Vector2(sourceCenter.X - anchorSize.X / 2f, sourceHand.Position.Y - anchorSize.Y - gap);
+                break;
+            case VisualSlot.Top:
+                targetPosition = new Vector2(sourceCenter.X - anchorSize.X / 2f, sourceHand.End.Y + gap);
+                break;
+            case VisualSlot.Left:
+                targetPosition = new Vector2(sourceHand.End.X + gap, sourceCenter.Y - anchorSize.Y / 2f);
+                break;
+            case VisualSlot.Right:
+                targetPosition = new Vector2(sourceHand.Position.X - anchorSize.X - gap, sourceCenter.Y - anchorSize.Y / 2f);
+                break;
+        }
+
+        _dealSourceAnchor.GlobalPosition = targetPosition;
+    }
+
+    private bool ShouldAbortDealAnimation(int runId, int roundNumber)
+    {
+        if (!_isDealAnimationRunning || runId != _dealAnimationRunId)
+        {
+            return true;
+        }
+
+        var latestSnapshot = LobbyManager.Instance.LocalMatchSnapshot;
+        if (latestSnapshot.Count == 0)
+        {
+            return true;
+        }
+
+        var latestRoundNumber = latestSnapshot.TryGetValue("roundNumber", out var roundVariant)
+            ? roundVariant.AsInt32()
+            : roundNumber;
+        return latestRoundNumber != roundNumber;
+    }
+
+    private void UpdateTurnSpotlight(SeatPosition currentTurnSeat, OmiPhase phase)
+    {
+        var baseIdleAlpha = UiMotionProfile.VignetteIdleAlpha;
+        var activeAlpha = UiMotionProfile.VignetteActiveAlpha;
+        var overlayAlpha = phase switch
+        {
+            OmiPhase.KapothiProposal or OmiPhase.KapothiResponse => Mathf.Clamp(activeAlpha + 0.02f, 0f, 0.28f),
+            OmiPhase.TrickPlay => activeAlpha,
+            _ => baseIdleAlpha
+        };
+        var duration = (float)Math.Max(0.06, UiMotionProfile.MicroDurationSeconds * 1.4);
+
+        var tween = CreateTween();
+        tween.TweenProperty(_focusVignette, "color:a", overlayAlpha, duration)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+
+        foreach (SeatPosition seat in Enum.GetValues(typeof(SeatPosition)))
+        {
+            var label = GetLabelForSeat(seat);
+            if (label == null)
+            {
+                continue;
+            }
+
+            var isActive = seat == currentTurnSeat;
+            var targetColor = isActive ? new Color(1f, 0.96f, 0.74f, 1f) : new Color(0.88f, 0.87f, 0.83f, 1f);
+            var targetScale = isActive ? new Vector2(1.05f, 1.05f) : Vector2.One;
+            var labelTween = CreateTween();
+            labelTween.SetParallel(true);
+            labelTween.TweenProperty(label, "modulate", targetColor, duration)
+                .SetTrans(Tween.TransitionType.Cubic)
+                .SetEase(Tween.EaseType.Out);
+            labelTween.TweenProperty(label, "scale", targetScale, duration)
+                .SetTrans(Tween.TransitionType.Cubic)
+                .SetEase(Tween.EaseType.Out);
+        }
+    }
+
+    private void PulseSeatLabel(SeatPosition seat)
+    {
+        var label = GetLabelForSeat(seat);
+        if (label == null)
+        {
+            return;
+        }
+
+        var tween = CreateTween();
+        tween.SetParallel(true);
+        var pulseDuration = (float)Math.Max(0.05, UiMotionProfile.MicroDurationSeconds * 0.75);
+        var settleDuration = (float)Math.Max(0.08, UiMotionProfile.MicroDurationSeconds * 1.1);
+        tween.TweenProperty(label, "scale", new Vector2(1.09f, 1.09f), pulseDuration)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        tween.TweenProperty(label, "modulate", new Color(1f, 0.94f, 0.72f, 1f), pulseDuration)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        tween.Finished += () =>
+        {
+            if (!GodotObject.IsInstanceValid(label))
+            {
+                return;
+            }
+
+            var settle = CreateTween();
+            settle.SetParallel(true);
+            settle.TweenProperty(label, "scale", Vector2.One, settleDuration)
+                .SetTrans(Tween.TransitionType.Cubic)
+                .SetEase(Tween.EaseType.InOut);
+            settle.TweenProperty(label, "modulate", Colors.White, settleDuration)
+                .SetTrans(Tween.TransitionType.Cubic)
+                .SetEase(Tween.EaseType.InOut);
+        };
+    }
+
+    private Label? GetLabelForSeat(SeatPosition actualSeat)
+    {
+        return ToVisualSlot(actualSeat) switch
+        {
+            VisualSlot.Bottom => _bottomPlayerName,
+            VisualSlot.Right => _rightPlayerName,
+            VisualSlot.Top => _topPlayerName,
+            VisualSlot.Left => _leftPlayerName,
+            _ => null
+        };
+    }
+
+    private void PlayPhaseCueIfNeeded(OmiPhase phase)
+    {
+        if (_lastPhaseCue == phase)
+        {
+            return;
+        }
+
+        _lastPhaseCue = phase;
+        var cue = phase switch
+        {
+            OmiPhase.KapothiProposal or OmiPhase.KapothiResponse => UiSfxCue.KapothiDecision,
+            OmiPhase.RoundScore => UiSfxCue.RoundResolved,
+            OmiPhase.TrickResolveHold => UiSfxCue.TrickWin,
+            _ => UiSfxCue.MatchPhase
+        };
+        AudioManager.Instance?.PlayUiCue(cue, 0.84f, 0.02f);
+    }
+
+    private void HandlePhaseVisualEvents(OmiPhase phase, int roundNumber, int[] teamCredits, int[] teamTricks)
+    {
+        if (_lastPhase != phase && (phase == OmiPhase.KapothiProposal || phase == OmiPhase.KapothiResponse))
+        {
+            var text = phase == OmiPhase.KapothiProposal
+                ? "Kapothi opportunity opened."
+                : "Kapothi response required.";
+            _ = ShowKapothiBannerAsync(text);
+        }
+
+        if (_lastPhase != phase && phase == OmiPhase.RoundScore && _lastRoundBannerShown != roundNumber)
+        {
+            _lastRoundBannerShown = roundNumber;
+            _ = ShowRoundResultAsync(roundNumber, teamCredits, teamTricks);
+        }
+    }
+
+    private async Task ShowKapothiBannerAsync(string text)
+    {
+        var motionDuration = (float)Math.Max(0.1, UiMotionProfile.PanelEnterDurationSeconds * 0.75);
+        var holdDuration = (float)Math.Max(0.8, UiMotionProfile.GameBannerHoldSeconds - 0.4);
+        _kapothiBannerLabel.Text = text;
+        _kapothiBannerPanel.Visible = true;
+        _kapothiBannerPanel.Modulate = new Color(1f, 1f, 1f, 0f);
+        _kapothiBannerPanel.Scale = new Vector2(0.96f, 0.96f);
+
+        var tweenIn = CreateTween();
+        tweenIn.SetParallel(true);
+        tweenIn.TweenProperty(_kapothiBannerPanel, "modulate:a", 1f, motionDuration)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        tweenIn.TweenProperty(_kapothiBannerPanel, "scale", Vector2.One, motionDuration)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        await ToSignal(tweenIn, Tween.SignalName.Finished);
+
+        await ToSignal(GetTree().CreateTimer(holdDuration), SceneTreeTimer.SignalName.Timeout);
+
+        var tweenOut = CreateTween();
+        tweenOut.SetParallel(true);
+        tweenOut.TweenProperty(_kapothiBannerPanel, "modulate:a", 0f, motionDuration * 0.8f)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.In);
+        tweenOut.TweenProperty(_kapothiBannerPanel, "scale", new Vector2(1.03f, 1.03f), motionDuration * 0.8f)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.In);
+        await ToSignal(tweenOut, Tween.SignalName.Finished);
+
+        _kapothiBannerPanel.Visible = false;
+    }
+
+    private async Task ShowRoundResultAsync(int roundNumber, int[] teamCredits, int[] teamTricks)
+    {
+        var motionDuration = (float)Math.Max(0.12, UiMotionProfile.PanelEnterDurationSeconds * 0.9);
+        var holdDuration = (float)Math.Max(1.0, UiMotionProfile.GameBannerHoldSeconds);
+        _roundResultLabel.Text = $"Round {roundNumber} resolved | Credits {teamCredits[0]} - {teamCredits[1]} | Tricks {teamTricks[0]} - {teamTricks[1]}";
+        _roundResultPanel.Visible = true;
+        _roundResultPanel.Modulate = new Color(1f, 1f, 1f, 0f);
+        _roundResultPanel.Scale = new Vector2(0.95f, 0.95f);
+
+        var tweenIn = CreateTween();
+        tweenIn.SetParallel(true);
+        tweenIn.TweenProperty(_roundResultPanel, "modulate:a", 1f, motionDuration)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        tweenIn.TweenProperty(_roundResultPanel, "scale", Vector2.One, motionDuration)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        await ToSignal(tweenIn, Tween.SignalName.Finished);
+
+        await ToSignal(GetTree().CreateTimer(holdDuration), SceneTreeTimer.SignalName.Timeout);
+
+        var tweenOut = CreateTween();
+        tweenOut.SetParallel(true);
+        tweenOut.TweenProperty(_roundResultPanel, "modulate:a", 0f, motionDuration * 0.84f)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.In);
+        tweenOut.TweenProperty(_roundResultPanel, "scale", new Vector2(1.04f, 1.04f), motionDuration * 0.84f)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.In);
+        await ToSignal(tweenOut, Tween.SignalName.Finished);
+        _roundResultPanel.Visible = false;
+    }
+
     private async Task RunDealAnimationSequence(SeatPosition shufflerSeat, SeatPosition dealStartSeat, bool includeTrumpAnnouncement, int trumpSuit)
     {
         if (_isDealAnimationRunning)
@@ -301,8 +807,29 @@ public partial class GameScreen : Control
             return;
         }
 
+        var initialSnapshot = LobbyManager.Instance.LocalMatchSnapshot;
+        var dealPhase = initialSnapshot.TryGetValue("phase", out var phaseVariant)
+            ? (OmiPhase)phaseVariant.AsInt32()
+            : OmiPhase.LobbySeating;
+        var roundNumber = initialSnapshot.TryGetValue("roundNumber", out var roundVariant) ? roundVariant.AsInt32() : 0;
+        var targetCounts = BuildTargetHandCounts(initialSnapshot);
+        var currentCounts = BuildCurrentHandCounts();
+        if (currentCounts.Any(entry => entry.Value > targetCounts[entry.Key]))
+        {
+            ClearHands();
+            currentCounts = BuildCurrentHandCounts();
+        }
+
+        if (dealPhase == OmiPhase.SecondDeal)
+        {
+            EnsureDealBaselineCards(initialSnapshot, targetCounts, currentCounts, 4);
+        }
+
         _isDealAnimationRunning = true;
+        _dealAnimationRunId += 1;
+        var runId = _dealAnimationRunId;
         _actionPanel.Visible = false;
+        _dealSourceAnchor.Visible = false;
 
         if (includeTrumpAnnouncement && trumpSuit >= 0)
         {
@@ -310,84 +837,228 @@ public partial class GameScreen : Control
             await ShowTrumpAnnouncementAsync(trumpSelector, (CardSuit)trumpSuit);
         }
 
-        await AnimateDealAsync(shufflerSeat, dealStartSeat, 4);
-        _isDealAnimationRunning = false;
-
-        if (_pendingSnapshot.Count > 0)
+        if (!ShouldAbortDealAnimation(runId, roundNumber))
         {
-            var pending = _pendingSnapshot;
-            _pendingSnapshot = new Godot.Collections.Dictionary();
-            RenderSnapshot(pending);
+            await AnimateDealAsync(shufflerSeat, dealStartSeat, targetCounts, currentCounts, roundNumber, runId);
+        }
+
+        _isDealAnimationRunning = false;
+        _dealSourceAnchor.Visible = false;
+        _dealSourceStack.Scale = Vector2.One;
+        SetDealSourceDeckRemaining(0);
+
+        var snapshotToRender = _pendingSnapshot.Count > 0
+            ? _pendingSnapshot
+            : LobbyManager.Instance.LocalMatchSnapshot;
+        _pendingSnapshot = new Godot.Collections.Dictionary();
+
+        if (snapshotToRender.Count > 0)
+        {
+            RenderSnapshot(snapshotToRender);
         }
     }
 
     private async Task ShowTrumpAnnouncementAsync(string selectorName, CardSuit trumpSuit)
     {
+        var motionDuration = (float)Math.Max(0.12, UiMotionProfile.PanelEnterDurationSeconds * 0.85);
+        var holdDuration = Math.Max(0.2, UiMotionProfile.GameBannerHoldSeconds - 1.1);
         _trumpAnnouncementLabel.Text = $"{selectorName} selected {trumpSuit} as trump";
         _trumpAnnouncementPanel.Visible = true;
         _trumpAnnouncementPanel.Modulate = new Color(1f, 1f, 1f, 0f);
         _trumpAnnouncementPanel.Scale = new Vector2(0.92f, 0.92f);
+        AudioManager.Instance?.PlayUiCue(UiSfxCue.MatchPhase, 0.9f, 0.02f);
 
         var fadeIn = CreateTween();
-        fadeIn.TweenProperty(_trumpAnnouncementPanel, "modulate:a", 1f, 0.25f)
+        fadeIn.TweenProperty(_trumpAnnouncementPanel, "modulate:a", 1f, motionDuration)
             .SetTrans(Tween.TransitionType.Cubic)
             .SetEase(Tween.EaseType.Out);
-        fadeIn.Parallel().TweenProperty(_trumpAnnouncementPanel, "scale", Vector2.One, 0.25f)
+        fadeIn.Parallel().TweenProperty(_trumpAnnouncementPanel, "scale", Vector2.One, motionDuration)
             .SetTrans(Tween.TransitionType.Cubic)
             .SetEase(Tween.EaseType.Out);
         await ToSignal(fadeIn, Tween.SignalName.Finished);
 
-        await ToSignal(GetTree().CreateTimer(Math.Max(0.2, MatchTiming.TrumpAnnouncementSeconds - 0.5)), SceneTreeTimer.SignalName.Timeout);
+        await ToSignal(GetTree().CreateTimer(holdDuration), SceneTreeTimer.SignalName.Timeout);
 
         var fadeOut = CreateTween();
-        fadeOut.TweenProperty(_trumpAnnouncementPanel, "modulate:a", 0f, 0.22f)
+        fadeOut.TweenProperty(_trumpAnnouncementPanel, "modulate:a", 0f, motionDuration * 0.84f)
             .SetTrans(Tween.TransitionType.Cubic)
             .SetEase(Tween.EaseType.In);
-        fadeOut.Parallel().TweenProperty(_trumpAnnouncementPanel, "scale", new Vector2(1.05f, 1.05f), 0.22f)
+        fadeOut.Parallel().TweenProperty(_trumpAnnouncementPanel, "scale", new Vector2(1.05f, 1.05f), motionDuration * 0.84f)
             .SetTrans(Tween.TransitionType.Cubic)
             .SetEase(Tween.EaseType.In);
         await ToSignal(fadeOut, Tween.SignalName.Finished);
         _trumpAnnouncementPanel.Visible = false;
     }
 
-    private async Task AnimateDealAsync(SeatPosition shufflerSeat, SeatPosition dealStartSeat, int cardsPerSeat)
+    private async Task AnimateDealAsync(
+        SeatPosition shufflerSeat,
+        SeatPosition dealStartSeat,
+        IReadOnlyDictionary<SeatPosition, int> targetCounts,
+        IDictionary<SeatPosition, int> currentCounts,
+        int roundNumber,
+        int runId)
     {
         var dealOrder = dealStartSeat.OrderedFrom();
-        var seatCardIndex = new Dictionary<SeatPosition, int>();
-        foreach (SeatPosition seat in Enum.GetValues(typeof(SeatPosition)))
+        var maxCardsToAdd = targetCounts.Max(entry => Math.Max(0, entry.Value - currentCounts[entry.Key]));
+        if (maxCardsToAdd <= 0)
         {
-            seatCardIndex[seat] = 0;
+            return;
         }
 
-        for (var pass = 0; pass < cardsPerSeat; pass++)
+        UpdateDealSourcePosition(shufflerSeat);
+        _dealSourceAnchor.Visible = true;
+        _dealSourceStack.Modulate = Colors.White;
+        var remainingCards = targetCounts.Sum(entry => Math.Max(0, entry.Value - currentCounts[entry.Key]));
+        SetDealSourceDeckRemaining(remainingCards);
+        UpdateSideHandLayoutFromCounts(currentCounts);
+
+        for (var pass = 0; pass < maxCardsToAdd; pass++)
         {
             foreach (var targetSeat in dealOrder)
             {
-                SpawnDealCard(shufflerSeat, targetSeat, seatCardIndex[targetSeat]);
-                seatCardIndex[targetSeat] += 1;
-                PlaySound(_dealSlideSound);
-                await ToSignal(GetTree().CreateTimer(MatchTiming.DealCardIntervalSeconds), SceneTreeTimer.SignalName.Timeout);
+                if (ShouldAbortDealAnimation(runId, roundNumber))
+                {
+                    return;
+                }
+
+                if (currentCounts[targetSeat] >= targetCounts[targetSeat])
+                {
+                    continue;
+                }
+
+                var seatCardIndex = currentCounts[targetSeat];
+                CardModel? exposedBottomCard = null;
+                if (ShouldRevealDealtCardFace(targetSeat) &&
+                    TryGetVisibleCardModel(LobbyManager.Instance.LocalMatchSnapshot, targetSeat, seatCardIndex, out var visibleModel))
+                {
+                    exposedBottomCard = visibleModel;
+                }
+
+                await SpawnDealCardAsync(shufflerSeat, targetSeat, seatCardIndex, exposedBottomCard, roundNumber, runId);
+                currentCounts[targetSeat] += 1;
+                remainingCards = Math.Max(0, remainingCards - 1);
+                SetDealSourceDeckRemaining(remainingCards);
+                UpdateSideHandLayoutFromCounts(currentCounts);
+
+                if (ShouldAbortDealAnimation(runId, roundNumber))
+                {
+                    return;
+                }
+
+                await ToSignal(GetTree().CreateTimer(UiMotionProfile.DealIntervalSeconds), SceneTreeTimer.SignalName.Timeout);
             }
         }
 
-        await ToSignal(GetTree().CreateTimer(MatchTiming.DealCardTravelSeconds + 0.05), SceneTreeTimer.SignalName.Timeout);
+        await ToSignal(GetTree().CreateTimer(Math.Max(0.03, UiMotionProfile.DealTravelSeconds * 0.2)), SceneTreeTimer.SignalName.Timeout);
     }
 
-    private void SpawnDealCard(SeatPosition shufflerSeat, SeatPosition targetSeat, int seatCardIndex)
+    private async Task SpawnDealCardAsync(
+        SeatPosition shufflerSeat,
+        SeatPosition targetSeat,
+        int seatCardIndex,
+        CardModel? exposedBottomCard,
+        int roundNumber,
+        int runId)
     {
-        var card = CreateCard(new CardModel($"deal-{Time.GetTicksMsec()}-{seatCardIndex}", CardSuit.Spades, CardRank.Ace), false, false);
-        _animationLayer.AddChild(card);
-        var cardSize = EnsureCardSize(card);
+        if (ShouldAbortDealAnimation(runId, roundNumber))
+        {
+            return;
+        }
 
-        card.GlobalPosition = GetHandCenterGlobal(shufflerSeat, cardSize);
-        card.ZIndex = 900 + seatCardIndex;
+        var flyModel = exposedBottomCard ?? new CardModel($"deal-fly-{targetSeat}-{seatCardIndex}", CardSuit.Spades, CardRank.Ace);
+        var flyCard = CreateCard(flyModel, false, false);
+        _animationLayer.AddChild(flyCard);
+        flyCard.ZIndex = 900 + seatCardIndex;
+        var cardSize = EnsureCardSize(flyCard);
+
+        var source = _dealSourceAnchor.Visible
+            ? _dealSourceAnchor.GlobalPosition + (_dealSourceAnchor.Size - cardSize) / 2f
+            : GetHandCenterGlobal(shufflerSeat, cardSize);
+        flyCard.GlobalPosition = source;
 
         var target = GetHandCenterGlobal(targetSeat, cardSize) + GetDealSeatOffset(targetSeat, seatCardIndex);
         var tween = CreateTween();
-        tween.TweenProperty(card, "global_position", target, (float)MatchTiming.DealCardTravelSeconds)
+        tween.SetParallel(true);
+        tween.TweenProperty(flyCard, "global_position", target, (float)UiMotionProfile.DealTravelSeconds)
             .SetTrans(Tween.TransitionType.Cubic)
             .SetEase(Tween.EaseType.Out);
-        tween.Finished += () => card.QueueFree();
+        tween.TweenProperty(_dealSourceStack, "scale", new Vector2(0.96f, 0.96f), (float)Math.Max(0.04, UiMotionProfile.MicroDurationSeconds * 0.55))
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        tween.TweenProperty(_dealSourceStack, "scale", Vector2.One, (float)Math.Max(0.05, UiMotionProfile.MicroDurationSeconds * 0.7))
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+
+        PlaySound(_dealSlideSound);
+        await ToSignal(tween, Tween.SignalName.Finished);
+
+        if (GodotObject.IsInstanceValid(flyCard))
+        {
+            flyCard.QueueFree();
+        }
+
+        if (ShouldAbortDealAnimation(runId, roundNumber))
+        {
+            return;
+        }
+
+        var insertedModel = exposedBottomCard ?? new CardModel($"hidden-{targetSeat}-{seatCardIndex}", CardSuit.Spades, CardRank.Ace);
+        var revealFace = exposedBottomCard.HasValue;
+        var insertedCard = CreateCard(insertedModel, false, false);
+        GetHandContainer(targetSeat).AddChild(insertedCard);
+        insertedCard.Modulate = new Color(1f, 1f, 1f, UiSettings.ReduceMotion ? 1f : 0f);
+        insertedCard.Scale = UiSettings.ReduceMotion ? Vector2.One : new Vector2(0.94f, 0.94f);
+        await PlayDealArrivalVisualAsync(insertedCard, revealFace);
+    }
+
+    private async Task PlayDealArrivalVisualAsync(Card insertedCard, bool shouldRevealFace)
+    {
+        var revealDuration = (float)Math.Max(0.06, UiMotionProfile.DealFlipSeconds);
+        var useCinematicFlip = shouldRevealFace && !UiSettings.ReduceMotion;
+
+        if (useCinematicFlip)
+        {
+            insertedCard.SetFaceUp(false);
+            insertedCard.Modulate = new Color(1f, 1f, 1f, 1f);
+            insertedCard.Scale = Vector2.One;
+
+            var firstHalf = CreateTween();
+            firstHalf.TweenProperty(insertedCard, "scale:x", 0.06f, revealDuration * 0.5f)
+                .SetTrans(Tween.TransitionType.Cubic)
+                .SetEase(Tween.EaseType.In);
+            await ToSignal(firstHalf, Tween.SignalName.Finished);
+
+            insertedCard.SetFaceUp(true);
+            var secondHalf = CreateTween();
+            secondHalf.SetParallel(true);
+            secondHalf.TweenProperty(insertedCard, "scale:x", 1f, revealDuration * 0.5f)
+                .SetTrans(Tween.TransitionType.Cubic)
+                .SetEase(Tween.EaseType.Out);
+            secondHalf.TweenProperty(insertedCard, "scale:y", 1.03f, revealDuration * 0.25f)
+                .SetTrans(Tween.TransitionType.Cubic)
+                .SetEase(Tween.EaseType.Out);
+            secondHalf.TweenProperty(insertedCard, "scale:y", 1f, revealDuration * 0.25f)
+                .SetDelay(revealDuration * 0.25f)
+                .SetTrans(Tween.TransitionType.Cubic)
+                .SetEase(Tween.EaseType.InOut);
+            await ToSignal(secondHalf, Tween.SignalName.Finished);
+            return;
+        }
+
+        if (shouldRevealFace)
+        {
+            insertedCard.SetFaceUp(true);
+        }
+
+        var settle = CreateTween();
+        settle.SetParallel(true);
+        settle.TweenProperty(insertedCard, "modulate:a", 1f, revealDuration * 0.65f)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        settle.TweenProperty(insertedCard, "scale", Vector2.One, revealDuration * 0.65f)
+            .SetTrans(Tween.TransitionType.Cubic)
+            .SetEase(Tween.EaseType.Out);
+        await ToSignal(settle, Tween.SignalName.Finished);
     }
 
     private Vector2 GetHandCenterGlobal(SeatPosition seat, Vector2 cardSize)
@@ -401,37 +1072,26 @@ public partial class GameScreen : Control
         var indexOffset = seatCardIndex - 1.5f;
         return ToVisualSlot(seat) switch
         {
-            VisualSlot.Bottom => new Vector2(indexOffset * 16f, 0),
-            VisualSlot.Top => new Vector2(indexOffset * 16f, 0),
-            VisualSlot.Left => new Vector2(0, indexOffset * 16f),
-            VisualSlot.Right => new Vector2(0, indexOffset * 16f),
+            VisualSlot.Bottom => new Vector2(indexOffset * 18f, 0),
+            VisualSlot.Top => new Vector2(indexOffset * 18f, 0),
+            VisualSlot.Left => new Vector2(0, indexOffset * 14f),
+            VisualSlot.Right => new Vector2(0, indexOffset * 14f),
             _ => Vector2.Zero
         };
     }
 
     private void RenderHands(Godot.Collections.Dictionary snapshot, OmiPhase phase, SeatPosition currentTurnSeat)
     {
-        var handCounts = snapshot.TryGetValue("handCounts", out var handCountsVariant) && handCountsVariant.VariantType == Variant.Type.Dictionary
-            ? handCountsVariant.AsGodotDictionary()
-            : new Godot.Collections.Dictionary();
-
-        var visibleHands = snapshot.TryGetValue("visibleHands", out var visibleHandsVariant) && visibleHandsVariant.VariantType == Variant.Type.Dictionary
-            ? visibleHandsVariant.AsGodotDictionary()
-            : new Godot.Collections.Dictionary();
+        var handCounts = ReadHandCounts(snapshot);
+        var visibleHands = ReadVisibleHands(snapshot);
+        var renderedCounts = new Dictionary<SeatPosition, int>();
 
         foreach (SeatPosition seat in Enum.GetValues(typeof(SeatPosition)))
         {
             var container = GetHandContainer(seat);
-            var visibleCards = new Godot.Collections.Array();
-
-            if (visibleHands.TryGetValue(seat.ToString(), out var cardsVariant) && cardsVariant.VariantType == Variant.Type.Array)
-            {
-                visibleCards = cardsVariant.AsGodotArray();
-            }
-
-            var totalCount = handCounts.TryGetValue(seat.ToString(), out var countVariant)
-                ? countVariant.AsInt32()
-                : visibleCards.Count;
+            var visibleCards = ReadVisibleCardsForSeat(visibleHands, seat);
+            var totalCount = ResolveSeatHandCount(handCounts, seat, visibleCards.Count);
+            renderedCounts[seat] = totalCount;
 
             var isLocalPlayableSeat = _localSeat.HasValue && _localSeat.Value == seat && _localRole == ParticipantRole.Player;
             var canInteract = isLocalPlayableSeat && phase == OmiPhase.TrickPlay && currentTurnSeat == seat;
@@ -457,9 +1117,11 @@ public partial class GameScreen : Control
                 }
             }
         }
+
+        UpdateSideHandLayoutFromCounts(renderedCounts);
     }
 
-    private void RenderTrickState(Godot.Collections.Dictionary snapshot, int roundNumber, SeatPosition currentTurnSeat, int[] teamTricks)
+    private void RenderTrickState(Godot.Collections.Dictionary snapshot, int roundNumber, SeatPosition currentTurnSeat, int[] teamTricks, bool suppressEntryAudio)
     {
         if (_lastRoundNumber != -1 && roundNumber != _lastRoundNumber)
         {
@@ -517,11 +1179,14 @@ public partial class GameScreen : Control
             card.Position = GetDeskSpawnPosition(seat, cardSize);
 
             var tween = CreateTween();
-            tween.TweenProperty(card, "position", GetDeskCardPosition(seat, cardSize), 0.22f)
+            tween.TweenProperty(card, "position", GetDeskCardPosition(seat, cardSize), (float)UiMotionProfile.DeskPlayTravelSeconds)
                 .SetTrans(Tween.TransitionType.Cubic)
                 .SetEase(Tween.EaseType.Out);
             _deskCards[seat] = card;
-            PlaySound(_placeSounds);
+            if (!suppressEntryAudio)
+            {
+                PlaySound(_placeSounds);
+            }
         }
 
         foreach (var seat in _deskCards.Keys.ToList())
@@ -724,7 +1389,104 @@ public partial class GameScreen : Control
             return;
         }
 
+        if (!CanPlayCardFromSnapshot(card.CardId))
+        {
+            return;
+        }
+
+        AudioManager.Instance?.PlayUiCue(UiSfxCue.Confirm, 0.72f, 0.02f);
         NetworkRpc.Instance.SendPlayCardRequest(card.CardId);
+    }
+
+    private bool CanPlayCardFromSnapshot(string cardId)
+    {
+        var snapshot = LobbyManager.Instance.LocalMatchSnapshot;
+        if (snapshot.Count == 0 || !_localSeat.HasValue)
+        {
+            return true;
+        }
+
+        var phase = snapshot.TryGetValue("phase", out var phaseVariant)
+            ? (OmiPhase)phaseVariant.AsInt32()
+            : OmiPhase.LobbySeating;
+        if (phase != OmiPhase.TrickPlay)
+        {
+            return false;
+        }
+
+        var currentTurnSeat = snapshot.TryGetValue("currentTurnSeat", out var turnVariant)
+            ? NetDex.Core.Enums.SeatPositionExtensions.Parse(turnVariant.AsString())
+            : null;
+        if (!currentTurnSeat.HasValue || currentTurnSeat.Value != _localSeat.Value)
+        {
+            return false;
+        }
+
+        var visibleHands = ReadVisibleHands(snapshot);
+        if (!visibleHands.TryGetValue(_localSeat.Value.ToString(), out var localHandVariant) || localHandVariant.VariantType != Variant.Type.Array)
+        {
+            return true;
+        }
+
+        var localCards = localHandVariant.AsGodotArray();
+        var localHandModels = new List<CardModel>(localCards.Count);
+        CardModel selectedCard = default;
+        var foundSelectedCard = false;
+
+        foreach (var item in localCards)
+        {
+            if (item.VariantType != Variant.Type.Dictionary)
+            {
+                continue;
+            }
+
+            var model = CardModelConversions.FromDictionary(item.AsGodotDictionary());
+            localHandModels.Add(model);
+            if (model.Id != cardId)
+            {
+                continue;
+            }
+
+            selectedCard = model;
+            foundSelectedCard = true;
+        }
+
+        if (!foundSelectedCard)
+        {
+            return true;
+        }
+
+        if (!snapshot.TryGetValue("currentTrick", out var trickVariant) || trickVariant.VariantType != Variant.Type.Array)
+        {
+            return true;
+        }
+
+        var currentTrick = trickVariant.AsGodotArray();
+        if (currentTrick.Count == 0)
+        {
+            return true;
+        }
+
+        var firstPlay = currentTrick[0];
+        if (firstPlay.VariantType != Variant.Type.Dictionary)
+        {
+            return true;
+        }
+
+        var firstPlayDict = firstPlay.AsGodotDictionary();
+        if (!firstPlayDict.TryGetValue("card", out var leadCardVariant) || leadCardVariant.VariantType != Variant.Type.Dictionary)
+        {
+            return true;
+        }
+
+        var leadCard = CardModelConversions.FromDictionary(leadCardVariant.AsGodotDictionary());
+        if (selectedCard.Suit == leadCard.Suit)
+        {
+            return true;
+        }
+
+        var hasLeadSuit = localHandModels.Any(localCard => localCard.Suit == leadCard.Suit);
+        return !hasLeadSuit;
     }
 
     private static void OnBackLobbyPressed()
@@ -739,21 +1501,28 @@ public partial class GameScreen : Control
 
     private void TogglePauseMenu()
     {
-        var pauseMenu = GetNodeOrNull<Control>("PauseMenu");
+        var pauseMenu = GetNodeOrNull<PauseMenu>("PauseMenu");
         if (pauseMenu == null)
         {
             pauseMenu = EnsurePauseMenu();
-            pauseMenu.Show();
+            pauseMenu.ShowMenu();
             return;
         }
 
-        pauseMenu.Visible = !pauseMenu.Visible;
+        if (pauseMenu.Visible)
+        {
+            pauseMenu.HideMenu();
+        }
+        else
+        {
+            pauseMenu.ShowMenu();
+        }
     }
 
-    private Control EnsurePauseMenu()
+    private PauseMenu EnsurePauseMenu()
     {
         var pauseMenuScene = GD.Load<PackedScene>("res://scenes/ui/PauseMenu.tscn");
-        var pauseMenu = pauseMenuScene.Instantiate<Control>();
+        var pauseMenu = pauseMenuScene.Instantiate<PauseMenu>();
         pauseMenu.Name = "PauseMenu";
         AddChild(pauseMenu);
         return pauseMenu;
@@ -768,6 +1537,7 @@ public partial class GameScreen : Control
         if (interactable)
         {
             card.CardClicked += OnCardClicked;
+            card.CardSelected += OnCardSelected;
         }
 
         if (faceUp && playRevealSound)
@@ -776,6 +1546,19 @@ public partial class GameScreen : Control
         }
 
         return card;
+    }
+
+    private void OnCardSelected(Card selectedCard)
+    {
+        foreach (Node child in _bottomHand.GetChildren())
+        {
+            if (child is not Card card || card == selectedCard)
+            {
+                continue;
+            }
+
+            card.SetSelected(false);
+        }
     }
 
     private void ClearHands()
@@ -788,6 +1571,7 @@ public partial class GameScreen : Control
 
     private void ResetBoardVisualState()
     {
+        ClearHands();
         ClearTrickAndPileVisuals();
         _lastRoundNumber = -1;
         _lastCompletedTricksCount = -1;
@@ -800,6 +1584,16 @@ public partial class GameScreen : Control
         _isDealAnimationRunning = false;
         _pendingSnapshot = new Godot.Collections.Dictionary();
         _trumpAnnouncementPanel.Visible = false;
+        _roundResultPanel.Visible = false;
+        _kapothiBannerPanel.Visible = false;
+        _lastPhaseCue = null;
+        _lastRoundBannerShown = -1;
+        _lastTurnSeat = null;
+        _focusVignette.Color = new Color(0f, 0f, 0f, UiMotionProfile.VignetteIdleAlpha);
+        _dealSourceAnchor.Visible = false;
+        _dealSourceStack.Scale = Vector2.One;
+        SetDealSourceDeckRemaining(0);
+        _suppressInitialDeskEntryAudio = true;
         ClearAnimationLayerCards();
     }
 
@@ -842,7 +1636,7 @@ public partial class GameScreen : Control
     {
         foreach (Node child in _animationLayer.GetChildren())
         {
-            if (child == _trumpAnnouncementPanel)
+            if (child == _trumpAnnouncementPanel || child == _roundResultPanel || child == _kapothiBannerPanel || child == _dealSourceAnchor)
             {
                 continue;
             }
@@ -924,10 +1718,20 @@ public partial class GameScreen : Control
             }
         }
 
-        _bottomPlayerName.Text = seatNames[ToSeatForVisualSlot(VisualSlot.Bottom)];
-        _rightPlayerName.Text = seatNames[ToSeatForVisualSlot(VisualSlot.Right)];
-        _topPlayerName.Text = seatNames[ToSeatForVisualSlot(VisualSlot.Top)];
-        _leftPlayerName.Text = seatNames[ToSeatForVisualSlot(VisualSlot.Left)];
+        var bottomName = seatNames[ToSeatForVisualSlot(VisualSlot.Bottom)];
+        var rightName = seatNames[ToSeatForVisualSlot(VisualSlot.Right)];
+        var topName = seatNames[ToSeatForVisualSlot(VisualSlot.Top)];
+        var leftName = seatNames[ToSeatForVisualSlot(VisualSlot.Left)];
+
+        _bottomPlayerName.Text = bottomName;
+        _topPlayerName.Text = topName;
+        _leftPlayerName.Text = leftName;
+        _rightPlayerName.Text = rightName;
+
+        _bottomPlayerName.TooltipText = bottomName;
+        _topPlayerName.TooltipText = topName;
+        _leftPlayerName.TooltipText = leftName;
+        _rightPlayerName.TooltipText = rightName;
     }
 
     private SeatPosition ToSeatForVisualSlot(VisualSlot visualSlot)
@@ -990,16 +1794,19 @@ public partial class GameScreen : Control
 
         var tween = CreateTween();
         tween.SetParallel(true);
+        var collectDuration = (float)Math.Max(0.16, UiMotionProfile.DeskPlayTravelSeconds + 0.08);
 
         for (var i = 0; i < cards.Count; i++)
         {
             var target = baseTarget + new Vector2((i % 2) * 12, (i / 2) * 8);
-            tween.TweenProperty(cards[i], "global_position", pile.GlobalPosition + target, 0.35f)
+            tween.TweenProperty(cards[i], "global_position", pile.GlobalPosition + target, collectDuration)
                 .SetTrans(Tween.TransitionType.Quad)
                 .SetEase(Tween.EaseType.InOut);
         }
 
         PlaySound(_slideSounds);
+        AudioManager.Instance?.PlayUiCue(UiSfxCue.TrickWin, 0.78f, 0.02f);
+        FlashWinningTeamLabels(winnerTeam);
 
         tween.Finished += () =>
         {
@@ -1011,6 +1818,50 @@ public partial class GameScreen : Control
             _isCollectingTrick = false;
             SyncPileMarkers(_pendingFriendlyTricks, _pendingEnemyTricks);
         };
+    }
+
+    private void FlashWinningTeamLabels(int winningTeam)
+    {
+        foreach (SeatPosition seat in Enum.GetValues(typeof(SeatPosition)))
+        {
+            if (seat.TeamIndex() != winningTeam)
+            {
+                continue;
+            }
+
+            var label = GetLabelForSeat(seat);
+            if (label == null)
+            {
+                continue;
+            }
+
+            var tween = CreateTween();
+            tween.SetParallel(true);
+            var flashDuration = (float)Math.Max(0.08, UiMotionProfile.MicroDurationSeconds * 1.1);
+            var settleDuration = (float)Math.Max(0.1, UiMotionProfile.MicroDurationSeconds * 1.25);
+            tween.TweenProperty(label, "modulate", new Color(1f, 0.98f, 0.68f, 1f), flashDuration)
+                .SetTrans(Tween.TransitionType.Cubic)
+                .SetEase(Tween.EaseType.Out);
+            tween.TweenProperty(label, "scale", new Vector2(1.08f, 1.08f), flashDuration)
+                .SetTrans(Tween.TransitionType.Cubic)
+                .SetEase(Tween.EaseType.Out);
+            tween.Finished += () =>
+            {
+                if (!GodotObject.IsInstanceValid(label))
+                {
+                    return;
+                }
+
+                var settle = CreateTween();
+                settle.SetParallel(true);
+                settle.TweenProperty(label, "modulate", Colors.White, settleDuration)
+                    .SetTrans(Tween.TransitionType.Cubic)
+                    .SetEase(Tween.EaseType.InOut);
+                settle.TweenProperty(label, "scale", Vector2.One, settleDuration)
+                    .SetTrans(Tween.TransitionType.Cubic)
+                    .SetEase(Tween.EaseType.InOut);
+            };
+        }
     }
 
     private void UpdatePileCounts(int[] teamTricks)
