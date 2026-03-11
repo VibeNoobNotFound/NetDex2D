@@ -162,7 +162,48 @@ jobs:
       - name: Validate Android export permissions
         run: bash src/tools/check_android_export_permissions.sh src/export_presets.cfg
 
-      - name: Normalize signing settings for CI exports
+      - name: Prepare prerelease Android signing + CI branding
+        if: needs.preflight.outputs.is_prerelease == 'true'
+        shell: bash
+        env:
+          ANDROID_PRERELEASE_KEYSTORE_B64: ${{ secrets.ANDROID_PRERELEASE_KEYSTORE_B64 }}
+          ANDROID_PRERELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PRERELEASE_KEYSTORE_PASSWORD }}
+          ANDROID_PRERELEASE_KEY_ALIAS: ${{ secrets.ANDROID_PRERELEASE_KEY_ALIAS }}
+          ANDROID_PRERELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_PRERELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${ANDROID_PRERELEASE_KEYSTORE_B64}" || -z "${ANDROID_PRERELEASE_KEYSTORE_PASSWORD}" || -z "${ANDROID_PRERELEASE_KEY_ALIAS}" || -z "${ANDROID_PRERELEASE_KEY_PASSWORD}" ]]; then
+            echo "::error::Missing prerelease Android signing secrets."
+            exit 1
+          fi
+          if [[ "${ANDROID_PRERELEASE_KEYSTORE_PASSWORD}" != "${ANDROID_PRERELEASE_KEY_PASSWORD}" ]]; then
+            echo "::error::Godot requires the keystore and key passwords to match."
+            exit 1
+          fi
+
+          keystore_path="${RUNNER_TEMP}/netdex-prerelease.keystore"
+          echo "${ANDROID_PRERELEASE_KEYSTORE_B64}" | base64 -d > "${keystore_path}"
+
+          {
+            echo "ANDROID_PRERELEASE_KEYSTORE_PATH=${keystore_path}"
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_PATH=${keystore_path}"
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=${ANDROID_PRERELEASE_KEY_ALIAS}"
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=${ANDROID_PRERELEASE_KEYSTORE_PASSWORD}"
+          } >> "${GITHUB_ENV}"
+
+          sed -i 's/^package\/unique_name=.*/package\/unique_name="com.noobnotfound.netdex2d.prerelease"/' src/export_presets.cfg
+          sed -i 's/^package\/name=.*/package\/name="NetDex (Beta)"/' src/export_presets.cfg
+          sed -i 's/^package\/signed=.*/package\/signed=true/' src/export_presets.cfg
+          grep -q '^package/unique_name="com.noobnotfound.netdex2d.prerelease"$' src/export_presets.cfg
+          grep -q '^package/name="NetDex (Beta)"$' src/export_presets.cfg
+          grep -q '^package/signed=true$' src/export_presets.cfg
+
+          sed -i 's/^config\/name=.*/config\/name="NetDex (Beta)"/' src/project.godot
+          grep -q '^config/name="NetDex (Beta)"$' src/project.godot
+
+      - name: Disable Android signing for non-prerelease CI exports
+        if: needs.preflight.outputs.is_prerelease != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -173,6 +214,11 @@ jobs:
           fi
           sed -i 's/^package\/signed=true$/package\/signed=false/' src/export_presets.cfg
           grep -q '^package/signed=false$' src/export_presets.cfg
+
+      - name: Disable macOS code signing for CI exports
+        shell: bash
+        run: |
+          set -euo pipefail
 
           # Linux runners do not provide Xcode tooling. Disable macOS code signing for CI export.
           if ! grep -q '^codesign/codesign=3$' src/export_presets.cfg; then
